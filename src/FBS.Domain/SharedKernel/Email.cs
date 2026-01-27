@@ -11,7 +11,7 @@ public partial record Email
         Value = value;
     }
 
-    internal static Email From(string email)
+    public static Email From(string email)
     {
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email cannot be empty", nameof(email));

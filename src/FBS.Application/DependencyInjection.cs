@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using FluentValidation;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FBS.Application;
 
@@ -7,21 +9,19 @@ public static class DependencyInjection
     // TODO
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        //var assembly = Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetExecutingAssembly();
 
-        //// MediatR
-        //services.AddMediatR(cfg =>
-        //{
-        //    cfg.RegisterServicesFromAssembly(assembly);
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(assembly);
 
-        //    // Pipeline behaviors (order matters!)
-        //    //cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
-        //    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
-        //    //cfg.AddOpenBehavior(typeof(TransactionBehavior<,>));
-        //});
+            // Pipeline behaviors (order matters!)
+            //cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            //cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            //cfg.AddOpenBehavior(typeof(TransactionBehavior<,>));
+        });
 
-        //// FluentValidation
-        //services.AddValidatorsFromAssembly(assembly);
+        services.AddValidatorsFromAssembly(assembly);
 
         return services;
     }
