@@ -11,7 +11,7 @@ public partial record PhoneNumber
         Value = value;
     }
 
-    internal static PhoneNumber From(string phone)
+    public static PhoneNumber From(string phone)
     {
         if (string.IsNullOrWhiteSpace(phone))
             throw new ArgumentException("Phone number cannot be empty", nameof(phone));
