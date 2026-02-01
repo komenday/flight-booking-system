@@ -1,6 +1,8 @@
 ﻿using FBS.Domain.Repositories;
+using FBS.Domain.Services;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Persistence.Repositories;
+using FBS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +41,8 @@ public static class DependencyInjection
         services.AddScoped<IFlightRepository, FlightRepository>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddScoped<IFlightProviderService, FlightProviderService>();
 
         // Hangfire (Phase 1 - optional, can add later)
         // services.AddHangfire(...)

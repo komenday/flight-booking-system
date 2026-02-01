@@ -1,10 +1,11 @@
-﻿using FBS.Domain.Repositories;
+﻿using FBS.Application.Common.Result;
+using FBS.Domain.Repositories;
 using FBS.Domain.Reservation;
 using MediatR;
 
 namespace FBS.Application.Queries.GetReservation;
 
-public class GetReservationHandler : IRequestHandler<GetReservationQuery, ReservationDetailsDto?>
+public class GetReservationHandler : IRequestHandler<GetReservationQuery, Result<ReservationDetailsDto>>
 {
     private readonly IReservationRepository _reservationRepository;
     private readonly IFlightRepository _flightRepository;
@@ -17,21 +18,25 @@ public class GetReservationHandler : IRequestHandler<GetReservationQuery, Reserv
         _flightRepository = flightRepository;
     }
 
-    public async Task<ReservationDetailsDto?> Handle(GetReservationQuery request, CancellationToken cancellationToken)
+    public async Task<Result<ReservationDetailsDto>> Handle(GetReservationQuery request, CancellationToken cancellationToken)
     {
         var reservationId = ReservationId.From(request.ReservationId);
 
         var reservation = await _reservationRepository.GetByIdAsync(reservationId, cancellationToken);
 
         if (reservation is null)
-            return null;
+        {
+            return Result.Failure<ReservationDetailsDto>($"Reservation with ID {request.ReservationId} was not found");
+        }
 
         var flight = await _flightRepository.GetByIdAsync(reservation.FlightId, cancellationToken);
 
         if (flight is null)
-            return null;
+        {
+            return Result.Failure<ReservationDetailsDto>($"Flight with ID {reservation.FlightId} was not found");
+        }
 
-        return new ReservationDetailsDto(
+        var reservationDetails = new ReservationDetailsDto(
             reservation.Id.Value,
             flight.Id.Value,
             flight.Number.Value,
@@ -48,5 +53,7 @@ public class GetReservationHandler : IRequestHandler<GetReservationQuery, Reserv
             reservation.ExpiresAt,
             reservation.ConfirmedAt
         );
+
+        return Result.Success(reservationDetails);
     }
 }
