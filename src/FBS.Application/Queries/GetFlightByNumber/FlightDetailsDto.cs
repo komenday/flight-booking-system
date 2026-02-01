@@ -13,6 +13,5 @@ public record FlightDetailsDto(
 
 public record SeatDto(
     string SeatNumber,
-    string SeatType,
     bool IsAvailable
 );

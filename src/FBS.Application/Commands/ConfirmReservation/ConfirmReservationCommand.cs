@@ -1,5 +1,6 @@
-﻿using MediatR;
+﻿using FBS.Application.Common.Result;
+using MediatR;
 
 namespace FBS.Application.Commands.ConfirmReservation;
 
-public record ConfirmReservationCommand(Guid ReservationId) : IRequest;
+public record ConfirmReservationCommand(Guid ReservationId) : IRequest<Result>;

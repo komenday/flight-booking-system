@@ -26,16 +26,17 @@ public class Flight : AggregateRoot<FlightId>
         Airport departure,
         Airport arrival,
         DateTime departureTime,
-        int totalSeats)
+        IEnumerable<Seat> seats)
     {
-        if (totalSeats <= 0)
-            throw new ArgumentException("Total seats must be greater than 0", nameof(totalSeats));
-
         if (departure == arrival)
             throw new ArgumentException("Departure and arrival airports must be different");
 
         if (departureTime <= DateTime.UtcNow)
             throw new ArgumentException("Departure time must be in the future");
+
+        var seatsList = seats.ToList();
+        if (seatsList.Count == 0)
+            throw new ArgumentException("Flight must have at least one seat");
 
         var flight = new Flight
         {
@@ -46,7 +47,7 @@ public class Flight : AggregateRoot<FlightId>
             DepartureTime = departureTime
         };
 
-        flight.GenerateSeats(totalSeats);
+        flight._seats.AddRange(seatsList);
 
         return flight;
     }
@@ -95,34 +96,5 @@ public class Flight : AggregateRoot<FlightId>
     public bool IsFull()
     {
         return !_seats.Any(s => s.IsAvailable);
-    }
-
-    private void GenerateSeats(int totalSeats)
-    {
-        const int seatsPerRow = 6;
-        var rows = (int)Math.Ceiling(totalSeats / (double)seatsPerRow);
-
-        for (int row = 1; row <= rows; row++)
-        {
-            for (char column = 'A'; column < 'A' + seatsPerRow; column++)
-            {
-                if (_seats.Count >= totalSeats)
-                    break;
-
-                var seatNumber = SeatNumber.From($"{row}{column}");
-                var seatType = DetermineSeatType(row);
-
-                _seats.Add(Seat.Create(seatNumber, seatType));
-            }
-        }
-    }
-
-    private static SeatType DetermineSeatType(int row)
-    {
-        return row switch
-        {
-            <= 3 => SeatType.Business,
-            _ => SeatType.Economy
-        };
     }
 }
