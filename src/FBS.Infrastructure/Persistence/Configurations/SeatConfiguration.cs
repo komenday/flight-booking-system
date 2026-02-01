@@ -19,11 +19,6 @@ public class SeatConfiguration : IEntityTypeConfiguration<Seat>
             .HasMaxLength(5)
             .IsRequired();
 
-        builder.Property(s => s.Type)
-            .HasConversion<string>()
-            .HasMaxLength(20)
-            .IsRequired();
-
         builder.Property(s => s.IsAvailable)
             .IsRequired();
 
