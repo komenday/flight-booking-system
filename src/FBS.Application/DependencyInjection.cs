@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using FBS.Application.Common.Behaviors;
 
 namespace FBS.Application;
 
@@ -15,10 +16,9 @@ public static class DependencyInjection
         {
             cfg.RegisterServicesFromAssembly(assembly);
 
-            // Pipeline behaviors (order matters!)
-            //cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
-            //cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
-            //cfg.AddOpenBehavior(typeof(TransactionBehavior<,>));
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            cfg.AddOpenBehavior(typeof(TransactionBehavior<,>));
         });
 
         services.AddValidatorsFromAssembly(assembly);
