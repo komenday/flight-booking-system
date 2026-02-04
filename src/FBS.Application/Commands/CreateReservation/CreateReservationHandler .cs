@@ -35,7 +35,7 @@ public class CreateReservationHandler : IRequestHandler<CreateReservationCommand
 
         if (flight is null)
         {
-            return Result.Failure<CreateReservationResponse>($"Flight with ID {request.FlightId} was not found");
+            return Result.NotFound<CreateReservationResponse>($"Flight with ID {request.FlightId} was not found");
         }
 
         var seatNumber = SeatNumber.From(request.SeatNumber);
@@ -52,15 +52,15 @@ public class CreateReservationHandler : IRequestHandler<CreateReservationCommand
         }
         catch (SeatNotFoundException ex)
         {
-            return Result.Failure<CreateReservationResponse>($"Seat {seatNumber.Value} not found on flight {flight.Number.Value}", ex);
+            return Result.NotFound<CreateReservationResponse>($"Seat {seatNumber.Value} not found on flight {flight.Number.Value}", ex);
         }
         catch (SeatNotAvailableException ex)
         {
-            return Result.Failure<CreateReservationResponse>($"Seat {seatNumber.Value} on flight {flight.Number.Value} is not available", ex);
+            return Result.Conflict<CreateReservationResponse>($"Seat {seatNumber.Value} on flight {flight.Number.Value} is not available", ex);
         }
         catch (FlightAlreadyDepartedException ex)
         {
-            return Result.Failure<CreateReservationResponse>($"Flight {flight.Number.Value} has already departed", ex);
+            return Result.Conflict<CreateReservationResponse>($"Flight {flight.Number.Value} has already departed", ex);
         }
 
         var reservation = Reservation.Create(flight.Id, seatNumber, passengerInfo);
