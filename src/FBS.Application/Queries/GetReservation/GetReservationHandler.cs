@@ -26,14 +26,14 @@ public class GetReservationHandler : IRequestHandler<GetReservationQuery, Result
 
         if (reservation is null)
         {
-            return Result.Failure<ReservationDetailsDto>($"Reservation with ID {request.ReservationId} was not found");
+            return Result.NotFound<ReservationDetailsDto>($"Reservation with ID {request.ReservationId} was not found");
         }
 
         var flight = await _flightRepository.GetByIdAsync(reservation.FlightId, cancellationToken);
 
         if (flight is null)
         {
-            return Result.Failure<ReservationDetailsDto>($"Flight with ID {reservation.FlightId} was not found");
+            return Result.NotFound<ReservationDetailsDto>($"Flight with ID {reservation.FlightId} was not found");
         }
 
         var reservationDetails = new ReservationDetailsDto(

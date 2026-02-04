@@ -22,7 +22,7 @@ public class GetFlightByNumberHandler : IRequestHandler<GetFlightByNumberQuery, 
 
         if (flight is null)
         {
-            return Result.Failure<FlightDetailsDto>($"Flight with flight number {request.FlightNumber} was not found");
+            return Result.NotFound<FlightDetailsDto>($"Flight with flight number {request.FlightNumber} was not found");
         }
 
         var flightDetails = new FlightDetailsDto(
