@@ -29,7 +29,7 @@ public class ConfirmReservationHandler : IRequestHandler<ConfirmReservationComma
 
         if (reservation is null)
         {
-            return Result.Failure($"Reservation with ID {request.ReservationId} was not found");
+            return Result.NotFound($"Reservation with ID {request.ReservationId} was not found");
         }
 
         try
@@ -38,11 +38,11 @@ public class ConfirmReservationHandler : IRequestHandler<ConfirmReservationComma
         }
         catch (InvalidReservationStateException ex)
         {
-            return Result.Failure(ex.Message, ex);
+            return Result.Conflict(ex.Message, ex);
         }
         catch (ReservationExpiredException ex)
         {
-            return Result.Failure(ex.Message, ex);
+            return Result.Conflict(ex.Message, ex);
         }
 
         _logger.LogInformation("Reservation {ReservationId} confirmed", reservationId);

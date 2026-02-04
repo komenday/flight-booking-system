@@ -34,14 +34,14 @@ public class CancelReservationHandler : IRequestHandler<CancelReservationCommand
 
         if (reservation is null)
         {
-            return Result.Failure($"Reservation with ID {request.ReservationId} was not found");
+            return Result.NotFound($"Reservation with ID {request.ReservationId} was not found");
         }
 
         var flight = await _flightRepository.GetByIdAsync(reservation.FlightId, cancellationToken) ?? throw new FlightNotFoundException(reservation.FlightId);
 
         if (flight is null)
         {
-            return Result.Failure($"Flight with ID {reservation.FlightId} was not found");
+            return Result.NotFound($"Flight with ID {reservation.FlightId} was not found");
         }
 
         try
@@ -51,7 +51,7 @@ public class CancelReservationHandler : IRequestHandler<CancelReservationCommand
         }
         catch (InvalidReservationStateException ex)
         {
-            return Result.Failure(ex.Message, exception: ex);
+            return Result.Conflict(ex.Message, ex);
         }
         catch (SeatNotFoundException ex)
         {

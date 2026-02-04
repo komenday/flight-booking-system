@@ -1,5 +1,6 @@
 ﻿using FBS.Domain.Repositories;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Common.Behaviors;
@@ -39,7 +40,20 @@ public class TransactionBehavior<TRequest, TResponse>
                 return response;
             }
 
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _logger.LogWarning(ex, "Concurrency conflict in {RequestName} - rolling back transaction", requestName);
+
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+
+                return CreateConcurrencyFailureResult<TResponse>(
+                    "A concurrency conflict occurred. The resource was modified by another user. Please retry.");
+            }
+
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation("Committed transaction for {RequestName}", requestName);
@@ -74,5 +88,34 @@ public class TransactionBehavior<TRequest, TResponse>
         }
 
         return true;
+    }
+
+    private static TResponse CreateConcurrencyFailureResult<T>(string errorMessage)
+    {
+        var resultType = typeof(T);
+
+        if (resultType.IsGenericType && resultType.GetGenericTypeDefinition().Name.StartsWith("Result"))
+        {
+            var conflictMethod = typeof(Result.Result)
+                .GetMethods()
+                .FirstOrDefault(m =>
+                    m.Name == "Conflict" &&
+                    m.IsGenericMethod &&
+                    m.GetParameters().Length == 2);
+
+            if (conflictMethod is not null)
+            {
+                var genericMethod = conflictMethod.MakeGenericMethod(resultType.GetGenericArguments());
+                var result = genericMethod.Invoke(null, [errorMessage, null]);
+                return (TResponse)result!;
+            }
+        }
+        else if (resultType == typeof(Result.Result))
+        {
+            var result = Result.Result.Conflict(errorMessage);
+            return (TResponse)(object)result;
+        }
+
+        throw new InvalidOperationException($"Cannot create failure result for type {resultType.Name}");
     }
 }
