@@ -10,7 +10,9 @@ public class SeatConfiguration : IEntityTypeConfiguration<Seat>
     {
         builder.ToTable("Seats");
 
-        builder.HasKey("Id");
+        builder.HasKey(s => s.Id);
+
+        builder.Property(s => s.Id).ValueGeneratedNever();
 
         builder.Property(s => s.Number)
             .HasConversion(
@@ -28,6 +30,9 @@ public class SeatConfiguration : IEntityTypeConfiguration<Seat>
                 value => FlightId.From(value))
             .IsRequired();
 
+        builder.HasIndex("FlightId", nameof(Seat.Number));
         builder.HasIndex("FlightId", nameof(Seat.IsAvailable));
+        builder.HasIndex("FlightId", nameof(Seat.Number))
+            .IsUnique();
     }
 }

@@ -2,7 +2,7 @@
 
 namespace FBS.Domain.Flight;
 
-public class Seat : Entity<SeatNumber>
+public class Seat : Entity<Guid>
 {
     public SeatNumber Number { get; private set; } = null!;
 
@@ -14,6 +14,7 @@ public class Seat : Entity<SeatNumber>
     {
         return new Seat
         {
+            Id = Guid.NewGuid(),
             Number = number,
             IsAvailable = true
         };
@@ -30,5 +31,18 @@ public class Seat : Entity<SeatNumber>
     internal void Release()
     {
         IsAvailable = true;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Seat other)
+            return false;
+
+        return Number == other.Number;
+    }
+
+    public override int GetHashCode()
+    {
+        return Number.GetHashCode();
     }
 }
