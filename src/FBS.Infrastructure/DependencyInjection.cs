@@ -1,8 +1,12 @@
-﻿using FBS.Domain.Repositories;
+﻿using FBS.Application.Common.Interfaces;
+using FBS.Domain.Repositories;
 using FBS.Domain.Services;
+using FBS.Infrastructure.BackgroundJobs;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Persistence.Repositories;
 using FBS.Infrastructure.Services;
+using Hangfire;
+using Hangfire.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,10 +47,31 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<IFlightProviderService, FlightProviderService>();
+        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
-        // Hangfire (Phase 1 - optional, can add later)
-        // services.AddHangfire(...)
-        // services.AddHangfireServer();
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(
+                configuration.GetConnectionString("DefaultConnection"),
+                new SqlServerStorageOptions
+                {
+                    CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+                    SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+                    QueuePollInterval = TimeSpan.Zero,
+                    UseRecommendedIsolationLevel = true,
+                    DisableGlobalLocks = true,
+                    SchemaName = "Hangfire"
+                }));
+
+        services.AddHangfireServer(options =>
+        {
+            options.WorkerCount = 2;
+            options.ServerName = "FBS-BackgroundProcessor";
+        });
+
+        services.AddScoped<ExpireReservationsJob>();
 
         return services;
     }

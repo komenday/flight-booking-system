@@ -49,7 +49,7 @@ public class Reservation : AggregateRoot<ReservationId>
             Passenger = passenger,
             Status = ReservationStatus.Pending,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10)
         };
 
         reservation.AddDomainEvent(new ReservationCreatedEvent(

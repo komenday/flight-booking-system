@@ -1,6 +1,8 @@
-﻿namespace FBS.Domain.Common.Interfaces;
+﻿using MediatR;
 
-public interface IDomainEvent
+namespace FBS.Domain.Common.Interfaces;
+
+public interface IDomainEvent : INotification
 {
     Guid EventId { get; }
 
