@@ -1,6 +1,9 @@
 using FBS.Application;
 using FBS.Infrastructure;
+using FBS.Infrastructure.BackgroundJobs;
 using FBS.Infrastructure.Persistence;
+using Hangfire;
+using Hangfire.Dashboard;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,11 +32,50 @@ if (app.Environment.IsDevelopment())
     await dbContext.Database.MigrateAsync();
 
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Flight Booking System API V1");
+        c.RoutePrefix = "swagger";
+    });
 }
+
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = app.Environment.IsDevelopment()
+        ? new[] { new HangfireAuthorizationFilter() }
+        : throw new InvalidOperationException("Configure authorization for Hangfire Dashboard in production")
+});
+
+ConfigureRecurringJobs();
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/", () => Results.Redirect("/swagger"))
+        .ExcludeFromDescription();
+}
+
 await app.RunAsync();
+
+static void ConfigureRecurringJobs()
+{
+    RecurringJob.AddOrUpdate<ExpireReservationsJob>(
+        "expire-reservations",
+        job => job.ExecuteAsync(CancellationToken.None),
+        "*/2 * * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Utc
+        });
+}
+
+public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
+{
+    public bool Authorize(DashboardContext context)
+    {
+        return true;
+    }
+}
