@@ -83,6 +83,7 @@ public class Flight : AggregateRoot<FlightId>
         var seat = _seats.FirstOrDefault(s => s.Number == seatNumber);
         return seat?.IsAvailable ?? false;
     }
+
     public bool HasDeparted()
     {
         return DateTime.UtcNow >= DepartureTime;
