@@ -2,7 +2,7 @@
 
 namespace FBS.Domain.Common.Base;
 
-public abstract class AggregateRoot<TId> : Entity<TId> where TId : notnull
+public abstract class AggregateRoot<TId> : Entity<TId>, IAggregateRoot where TId : notnull
 {
     private readonly List<IDomainEvent> _domainEvents = [];
 
