@@ -4,6 +4,7 @@ using FBS.Domain.Services;
 using FBS.Infrastructure.BackgroundJobs;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Persistence.Repositories;
+using FBS.Infrastructure.Seed;
 using FBS.Infrastructure.Services;
 using Hangfire;
 using Hangfire.SqlServer;
@@ -15,9 +16,7 @@ namespace FBS.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<ApplicationDbContext>(options =>
         {
@@ -72,6 +71,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<ExpireReservationsJob>();
+        services.AddScoped<FlightDataSeeder>();
 
         return services;
     }

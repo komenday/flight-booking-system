@@ -1,6 +1,6 @@
 ﻿using FBS.Domain.Common.Base;
+using FBS.Domain.Common.Rules;
 using FBS.Domain.Flight.Events;
-using FBS.Domain.Flight.Exceptions;
 using FBS.Domain.SharedKernel;
 
 namespace FBS.Domain.Flight;
@@ -28,25 +28,20 @@ public class Flight : AggregateRoot<FlightId>
         DateTime departureTime,
         IEnumerable<Seat> seats)
     {
-        if (departure == arrival)
-            throw new ArgumentException("Departure and arrival airports must be different");
-
-        if (departureTime <= DateTime.UtcNow)
-            throw new ArgumentException("Departure time must be in the future");
-
         var seatsList = seats.ToList();
-        if (seatsList.Count == 0)
-            throw new ArgumentException("Flight must have at least one seat");
+        var flight = new Flight();
 
-        var flight = new Flight
-        {
-            Id = FlightId.New(),
-            Number = number,
-            Departure = departure,
-            Arrival = arrival,
-            DepartureTime = departureTime
-        };
+        flight.CheckRules(
+            new AirportsMustBeDifferentRule(departure, arrival),
+            new DepartureTimeMustBeInFutureRule(departureTime),
+            new FlightMustHaveSeatsRule(seatsList.Count)
+        );
 
+        flight.Id = FlightId.New();
+        flight.Number = number;
+        flight.Departure = departure;
+        flight.Arrival = arrival;
+        flight.DepartureTime = departureTime;
         flight._seats.AddRange(seatsList);
 
         return flight;
@@ -54,26 +49,26 @@ public class Flight : AggregateRoot<FlightId>
 
     public void ReserveSeat(SeatNumber seatNumber)
     {
-        if (HasDeparted())
-            throw new FlightAlreadyDepartedException(Id, DepartureTime);
+        var seat = _seats.FirstOrDefault(s => s.Number == seatNumber);
 
-        var seat = _seats.FirstOrDefault(s => s.Number == seatNumber)
-            ?? throw new SeatNotFoundException(Number, seatNumber);
+        this.CheckRules(
+            new CannotReserveSeatOnDepartedFlightRule(DepartureTime),
+            new SeatMustExistRule(seat is not null, Number, seatNumber),
+            new SeatMustBeAvailableRule(seat?.IsAvailable ?? false, Number, seatNumber)
+        );
 
-        if (!seat.IsAvailable)
-            throw new SeatNotAvailableException(Number, seatNumber);
-
-        seat.Reserve();
+        seat!.Reserve();
 
         AddDomainEvent(new SeatReservedEvent(Id, seatNumber));
     }
 
     public void ReleaseSeat(SeatNumber seatNumber)
     {
-        var seat = _seats.FirstOrDefault(s => s.Number == seatNumber)
-            ?? throw new SeatNotFoundException(Number, seatNumber);
+        var seat = _seats.FirstOrDefault(s => s.Number == seatNumber);
 
-        seat?.Release();
+        this.CheckRule(new SeatMustExistRule(seat is not null, Number, seatNumber));
+
+        seat!.Release();
 
         AddDomainEvent(new SeatReleasedEvent(Id, seatNumber));
     }
@@ -84,9 +79,10 @@ public class Flight : AggregateRoot<FlightId>
         return seat?.IsAvailable ?? false;
     }
 
-    public bool HasDeparted()
+    public bool HasDeparted(DateTime? asOf = null)
     {
-        return DateTime.UtcNow >= DepartureTime;
+        var now = asOf ?? DateTime.UtcNow;
+        return now >= DepartureTime;
     }
 
     public int GetAvailableSeatsCount()

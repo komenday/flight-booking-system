@@ -1,6 +1,7 @@
 ﻿using FBS.Application.Common.Result;
+using FBS.Application.Extensions;
+using FBS.Domain.Common.Exceptions;
 using FBS.Domain.Flight;
-using FBS.Domain.Flight.Exceptions;
 using FBS.Domain.Repositories;
 using FBS.Domain.Reservation;
 using MediatR;
@@ -8,18 +9,18 @@ using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.CreateReservation;
 
-public class CreateReservationHandler : IRequestHandler<CreateReservationCommand, Result<CreateReservationResponse>>
+public class CreateReservationCommandHandler : IRequestHandler<CreateReservationCommand, Result<CreateReservationResponse>>
 {
     private readonly IReservationRepository _reservationRepository;
 
     private readonly IFlightRepository _flightRepository;
 
-    private readonly ILogger<CreateReservationHandler> _logger;
+    private readonly ILogger<CreateReservationCommandHandler> _logger;
 
-    public CreateReservationHandler(
+    public CreateReservationCommandHandler(
         IReservationRepository reservationRepository,
         IFlightRepository flightRepository,
-        ILogger<CreateReservationHandler> logger)
+        ILogger<CreateReservationCommandHandler> logger)
     {
         _reservationRepository = reservationRepository;
         _flightRepository = flightRepository;
@@ -50,17 +51,11 @@ public class CreateReservationHandler : IRequestHandler<CreateReservationCommand
         {
             flight.ReserveSeat(seatNumber);
         }
-        catch (SeatNotFoundException ex)
+        catch (BusinessRuleValidationException ex)
         {
-            return Result.NotFound<CreateReservationResponse>($"Seat {seatNumber.Value} not found on flight {flight.Number.Value}", ex);
-        }
-        catch (SeatNotAvailableException ex)
-        {
-            return Result.Conflict<CreateReservationResponse>($"Seat {seatNumber.Value} on flight {flight.Number.Value} is not available", ex);
-        }
-        catch (FlightAlreadyDepartedException ex)
-        {
-            return Result.Conflict<CreateReservationResponse>($"Flight {flight.Number.Value} has already departed", ex);
+            _logger.LogWarning(ex, "Business rule validation failed: {RuleName} ({ErrorType})", ex.BrokenRule.GetType().Name, ex.RuleErrorType);
+            var errorType = ex.RuleErrorType.ToErrorType();
+            return Result.Failure<CreateReservationResponse>(ex.Message, errorType, ex);
         }
 
         var reservation = Reservation.Create(flight.Id, seatNumber, passengerInfo);

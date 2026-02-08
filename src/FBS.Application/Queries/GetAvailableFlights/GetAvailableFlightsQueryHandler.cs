@@ -1,15 +1,16 @@
 ﻿using FBS.Application.Common.Result;
+using FBS.Domain.Common.Specifications;
 using FBS.Domain.Repositories;
 using FBS.Domain.SharedKernel;
 using MediatR;
 
 namespace FBS.Application.Queries.GetAvailableFlights;
 
-public class GetAvailableFlightsHandler : IRequestHandler<GetAvailableFlightsQuery, Result<List<FlightSummaryDto>>>
+public class GetAvailableFlightsQueryHandler : IRequestHandler<GetAvailableFlightsQuery, Result<List<FlightSummaryDto>>>
 {
     private readonly IFlightRepository _flightRepository;
 
-    public GetAvailableFlightsHandler(IFlightRepository flightRepository)
+    public GetAvailableFlightsQueryHandler(IFlightRepository flightRepository)
     {
         _flightRepository = flightRepository;
     }
@@ -19,7 +20,8 @@ public class GetAvailableFlightsHandler : IRequestHandler<GetAvailableFlightsQue
         var departure = Airport.From(request.DepartureAirport);
         var arrival = Airport.From(request.ArrivalAirport);
 
-        var flights = await _flightRepository.GetAvailableFlightsAsync(departure, arrival, request.Date, cancellationToken);
+        var spec = new AvailableFlightsSpecification(departure, arrival, request.Date);
+        var flights = await _flightRepository.GetAsync(spec, cancellationToken);
 
         var availableFlights = flights
             .Where(f => !f.IsFull())
