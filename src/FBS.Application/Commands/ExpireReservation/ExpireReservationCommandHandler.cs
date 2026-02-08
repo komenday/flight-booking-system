@@ -6,14 +6,14 @@ using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.ExpireReservation;
 
-public class ExpireReservationHandler : IRequestHandler<ExpireReservationCommand, Result>
+public class ExpireReservationCommandHandler : IRequestHandler<ExpireReservationCommand, Result>
 {
     private readonly IReservationRepository _reservationRepository;
-    private readonly ILogger<ExpireReservationHandler> _logger;
+    private readonly ILogger<ExpireReservationCommandHandler> _logger;
 
-    public ExpireReservationHandler(
+    public ExpireReservationCommandHandler(
         IReservationRepository reservationRepository,
-        ILogger<ExpireReservationHandler> logger)
+        ILogger<ExpireReservationCommandHandler> logger)
     {
         _reservationRepository = reservationRepository;
         _logger = logger;

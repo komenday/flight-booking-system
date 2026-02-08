@@ -1,6 +1,7 @@
-﻿using FBS.Domain.Flight;
+﻿using FBS.Domain.Common.Interfaces;
+using FBS.Domain.Flight;
 using FBS.Domain.Repositories;
-using FBS.Domain.SharedKernel;
+using FBS.Infrastructure.Persistence.Specifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace FBS.Infrastructure.Persistence.Repositories;
@@ -9,54 +10,31 @@ public class FlightRepository(ApplicationDbContext context) : IFlightRepository
 {
     private readonly ApplicationDbContext _context = context;
 
-    public async Task<Flight?> GetByIdAsync(
-        FlightId id,
-        CancellationToken cancellationToken = default)
+    public async Task<Flight?> GetByIdAsync(FlightId id, CancellationToken cancellationToken)
     {
         return await _context.Flights
             .Include(f => f.Seats)
             .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
     }
 
-    public async Task<Flight?> GetByFlightNumberAsync(
-        FlightNumber flightNumber,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Flight>> GetAsync(ISpecification<Flight> spec, CancellationToken cancellationToken)
     {
-        return await _context.Flights
-            .Include(f => f.Seats)
-            .FirstOrDefaultAsync(f => f.Number == flightNumber, cancellationToken);
+        var query = SpecificationEvaluator.GetQuery(_context.Flights, spec);
+        return await query.ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Flight>> GetAvailableFlightsAsync(
-        Airport departure,
-        Airport arrival,
-        DateTime date,
-        CancellationToken cancellationToken = default)
+    public async Task<Flight?> GetFirstOrDefaultAsync(ISpecification<Flight> spec, CancellationToken cancellationToken)
     {
-        var startOfDay = date.Date;
-        var endOfDay = date.Date.AddDays(1);
-
-        return await _context.Flights
-            .Include(f => f.Seats)
-            .Where(f =>
-                f.Departure == departure &&
-                f.Arrival == arrival &&
-                f.DepartureTime >= startOfDay &&
-                f.DepartureTime < endOfDay)
-            .OrderBy(f => f.DepartureTime)
-            .ToListAsync(cancellationToken);
+        var query = SpecificationEvaluator.GetQuery(_context.Flights, spec);
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task AddAsync(
-        Flight flight,
-        CancellationToken cancellationToken = default)
+    public async Task AddAsync(Flight flight, CancellationToken cancellationToken)
     {
         await _context.Flights.AddAsync(flight, cancellationToken);
     }
 
-    public Task UpdateAsync(
-        Flight flight,
-        CancellationToken cancellationToken = default)
+    public Task UpdateAsync(Flight flight, CancellationToken cancellationToken)
     {
         _context.Flights.Update(flight);
         return Task.CompletedTask;

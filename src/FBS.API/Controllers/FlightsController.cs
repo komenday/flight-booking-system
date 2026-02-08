@@ -1,4 +1,4 @@
-﻿using FBS.Application.Common.Result;
+﻿using FBS.API.DTOs;
 using FBS.Application.Queries.GetAvailableFlights;
 using FBS.Application.Queries.GetFlightByNumber;
 using MediatR;
@@ -8,17 +8,20 @@ namespace FBS.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class FlightsController(IMediator mediator) : ControllerBase
+public class FlightsController(IMediator mediator) : ApiControllerBase
 {
     private readonly IMediator _mediator = mediator;
 
     [HttpGet("search")]
-    public async Task<IActionResult> SearchFlights([FromQuery] string departureAirport, [FromQuery] string arrivalAirport, [FromQuery] DateTime date, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(IEnumerable<FlightSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SearchFlights([FromQuery] SearchFlightsRequest searchFlightsRequest, CancellationToken cancellationToken)
     {
         var query = new GetAvailableFlightsQuery(
-            departureAirport,
-            arrivalAirport,
-            date
+            searchFlightsRequest.DepartureAirport,
+            searchFlightsRequest.ArrivalAirport,
+            searchFlightsRequest.Date
         );
 
         var result = await _mediator.Send(query, cancellationToken);
@@ -29,6 +32,10 @@ public class FlightsController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet("{flightNumber}")]
+    [ProducesResponseType(typeof(FlightDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetFlightByNumber(string flightNumber, CancellationToken cancellationToken)
     {
         var query = new GetFlightByNumberQuery(flightNumber);
@@ -37,16 +44,5 @@ public class FlightsController(IMediator mediator) : ControllerBase
         return result.IsSuccess
             ? Ok(result.Value)
             : MapErrorToResponse(result.ErrorType, result.Error!);
-    }
-
-    private ObjectResult MapErrorToResponse(ErrorType errorType, string errorMessage)
-    {
-        return errorType switch
-        {
-            ErrorType.NotFound => NotFound(errorMessage),
-            ErrorType.Validation => BadRequest(errorMessage),
-            ErrorType.Conflict => Conflict(errorMessage),
-            _ => BadRequest(errorMessage)
-        };
     }
 }

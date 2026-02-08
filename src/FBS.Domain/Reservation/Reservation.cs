@@ -1,7 +1,7 @@
 ﻿using FBS.Domain.Common.Base;
+using FBS.Domain.Common.Rules;
 using FBS.Domain.Flight;
 using FBS.Domain.Reservation.Events;
-using FBS.Domain.Reservation.Exceptions;
 
 namespace FBS.Domain.Reservation;
 
@@ -64,11 +64,10 @@ public class Reservation : AggregateRoot<ReservationId>
 
     public void Confirm()
     {
-        if (Status is not ReservationStatus.Pending)
-            throw new InvalidReservationStateException(Id, Status, nameof(Confirm));
-
-        if (DateTime.UtcNow > ExpiresAt)
-            throw new ReservationExpiredException(Id, ExpiresAt);
+        this.CheckRules(
+            new ReservationMustBePendingToConfirmRule(Id, Status),
+            new ReservationMustNotBeExpiredToConfirmRule(Id, ExpiresAt)
+        );
 
         Status = ReservationStatus.Confirmed;
         ConfirmedAt = DateTime.UtcNow;
@@ -78,8 +77,7 @@ public class Reservation : AggregateRoot<ReservationId>
 
     public void Cancel()
     {
-        if (Status is ReservationStatus.Expired or ReservationStatus.Cancelled)
-            throw new InvalidReservationStateException(Id, Status, nameof(Cancel));
+        this.CheckRule(new CannotCancelExpiredOrCancelledReservationRule(Id, Status));
 
         Status = ReservationStatus.Cancelled;
 
@@ -88,10 +86,12 @@ public class Reservation : AggregateRoot<ReservationId>
 
     public void Expire()
     {
-        if (Status is not ReservationStatus.Pending)
+        var rule = new OnlyPendingReservationsCanExpireRule(Status);
+        if (rule.IsBroken())
             return;
 
         Status = ReservationStatus.Expired;
+
         AddDomainEvent(new ReservationExpiredEvent(Id, FlightId, SeatNumber));
     }
 }

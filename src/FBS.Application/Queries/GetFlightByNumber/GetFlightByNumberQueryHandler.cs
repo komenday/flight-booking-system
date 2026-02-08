@@ -1,15 +1,16 @@
 ﻿using FBS.Application.Common.Result;
+using FBS.Domain.Common.Specifications;
 using FBS.Domain.Flight;
 using FBS.Domain.Repositories;
 using MediatR;
 
 namespace FBS.Application.Queries.GetFlightByNumber;
 
-public class GetFlightByNumberHandler : IRequestHandler<GetFlightByNumberQuery, Result<FlightDetailsDto>>
+public class GetFlightByNumberQueryHandler : IRequestHandler<GetFlightByNumberQuery, Result<FlightDetailsDto>>
 {
     private readonly IFlightRepository _flightRepository;
 
-    public GetFlightByNumberHandler(IFlightRepository flightRepository)
+    public GetFlightByNumberQueryHandler(IFlightRepository flightRepository)
     {
         _flightRepository = flightRepository;
     }
@@ -18,7 +19,8 @@ public class GetFlightByNumberHandler : IRequestHandler<GetFlightByNumberQuery, 
     {
         var flightNumber = FlightNumber.From(request.FlightNumber);
 
-        var flight = await _flightRepository.GetByFlightNumberAsync(flightNumber, cancellationToken);
+        var spec = new FlightByNumberWithSeatsSpecification(flightNumber);
+        var flight = await _flightRepository.GetFirstOrDefaultAsync(spec, cancellationToken);
 
         if (flight is null)
         {
