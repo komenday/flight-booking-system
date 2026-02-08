@@ -8,3 +8,10 @@ public record CreateReservationCommand(
     string SeatNumber,
     PassengerInfoDto Passenger
 ) : IRequest<Result<CreateReservationResponse>>;
+
+public record PassengerInfoDto(
+    string FirstName,
+    string LastName,
+    string Email,
+    string Phone
+);

@@ -1,4 +1,5 @@
 ﻿using FBS.Domain.Common.Base;
+using FBS.Domain.Common.Rules;
 
 namespace FBS.Domain.Flight;
 
@@ -22,8 +23,7 @@ public class Seat : Entity<Guid>
 
     internal void Reserve()
     {
-        if (!IsAvailable)
-            throw new InvalidOperationException("Seat already reserved");
+        this.CheckRule(new SeatMustBeAvailableToReserveRule(IsAvailable, Number));
 
         IsAvailable = false;
     }

@@ -1,4 +1,5 @@
 ﻿using FBS.Application.Commands.ExpireReservation;
+using FBS.Domain.Common.Specifications;
 using FBS.Domain.Repositories;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,8 @@ public class ExpireReservationsJob(
 
         try
         {
-            var expiredReservations = await _reservationRepository.GetExpiredReservationsAsync(cancellationToken);
+            var spec = new ExpiredReservationsSpecification();
+            var expiredReservations = await _reservationRepository.GetAsync(spec, cancellationToken);
 
             if (!expiredReservations.Any())
             {
