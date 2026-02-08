@@ -1,20 +1,21 @@
 ﻿using FBS.Application.Common.Result;
+using FBS.Application.Extensions;
+using FBS.Domain.Common.Exceptions;
 using FBS.Domain.Repositories;
 using FBS.Domain.Reservation;
-using FBS.Domain.Reservation.Exceptions;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.ConfirmReservation;
 
-public class ConfirmReservationHandler : IRequestHandler<ConfirmReservationCommand, Result>
+public class ConfirmReservationCommandHandler : IRequestHandler<ConfirmReservationCommand, Result>
 {
     private readonly IReservationRepository _reservationRepository;
-    private readonly ILogger<ConfirmReservationHandler> _logger;
+    private readonly ILogger<ConfirmReservationCommandHandler> _logger;
 
-    public ConfirmReservationHandler(
+    public ConfirmReservationCommandHandler(
         IReservationRepository reservationRepository,
-        ILogger<ConfirmReservationHandler> logger)
+        ILogger<ConfirmReservationCommandHandler> logger)
     {
         _reservationRepository = reservationRepository;
         _logger = logger;
@@ -36,13 +37,11 @@ public class ConfirmReservationHandler : IRequestHandler<ConfirmReservationComma
         {
             reservation.Confirm();
         }
-        catch (InvalidReservationStateException ex)
+        catch (BusinessRuleValidationException ex)
         {
-            return Result.Conflict(ex.Message, ex);
-        }
-        catch (ReservationExpiredException ex)
-        {
-            return Result.Conflict(ex.Message, ex);
+            _logger.LogWarning(ex, "Business rule validation failed: {RuleName} ({ErrorType})", ex.BrokenRule.GetType().Name, ex.RuleErrorType);
+            var errorType = ex.RuleErrorType.ToErrorType();
+            return Result.Failure(ex.Message, errorType, ex);
         }
 
         _logger.LogInformation("Reservation {ReservationId} confirmed", reservationId);

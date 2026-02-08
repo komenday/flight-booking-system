@@ -2,7 +2,6 @@
 using FBS.Application.Commands.CancelReservation;
 using FBS.Application.Commands.ConfirmReservation;
 using FBS.Application.Commands.CreateReservation;
-using FBS.Application.Common.Result;
 using FBS.Application.Queries.GetReservation;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +10,15 @@ namespace FBS.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ReservationsController(IMediator mediator) : ControllerBase
+public class ReservationsController(IMediator mediator) : ApiControllerBase
 {
     private readonly IMediator _mediator = mediator;
 
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(ReservationDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReservation(Guid id, CancellationToken cancellationToken)
     {
         var query = new GetReservationQuery(id);
@@ -27,6 +30,11 @@ public class ReservationsController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost]
+    [ProducesResponseType(typeof(CreateReservationResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateReservation([FromBody] CreateReservationRequest request, CancellationToken cancellationToken)
     {
         var command = new CreateReservationCommand(
@@ -51,6 +59,11 @@ public class ReservationsController(IMediator mediator) : ControllerBase
     }
 
     [HttpPut("{id}/confirm")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ConfirmReservation(Guid id, CancellationToken cancellationToken)
     {
         var command = new ConfirmReservationCommand(id);
@@ -62,6 +75,11 @@ public class ReservationsController(IMediator mediator) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CancelReservation(Guid id, CancellationToken cancellationToken)
     {
         var command = new CancelReservationCommand(id);
@@ -70,18 +88,5 @@ public class ReservationsController(IMediator mediator) : ControllerBase
         return result.IsSuccess
             ? NoContent()
             : MapErrorToResponse(result.ErrorType, result.Error!);
-    }
-
-    private ObjectResult MapErrorToResponse(ErrorType errorType, string errorMessage)
-    {
-        return errorType switch
-        {
-            ErrorType.NotFound => NotFound(errorMessage),
-            ErrorType.Validation => BadRequest(errorMessage),
-            ErrorType.Conflict => Conflict(errorMessage),
-            ErrorType.Unauthorized => Unauthorized(errorMessage),
-            ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, errorMessage),
-            _ => BadRequest(errorMessage)
-        };
     }
 }

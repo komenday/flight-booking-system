@@ -2,6 +2,7 @@ using FBS.Application;
 using FBS.Infrastructure;
 using FBS.Infrastructure.BackgroundJobs;
 using FBS.Infrastructure.Persistence;
+using FBS.Infrastructure.Seed;
 using Hangfire;
 using Hangfire.Dashboard;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +30,11 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
     await dbContext.Database.MigrateAsync();
+
+    var seeder = scope.ServiceProvider.GetRequiredService<FlightDataSeeder>();
+    await seeder.SeedAsync(15);
 
     app.UseSwagger();
     app.UseSwaggerUI(c =>

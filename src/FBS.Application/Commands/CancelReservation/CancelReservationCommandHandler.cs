@@ -1,24 +1,24 @@
 ﻿using FBS.Application.Common.Result;
 using FBS.Application.Exceptions;
-using FBS.Domain.Flight.Exceptions;
+using FBS.Application.Extensions;
+using FBS.Domain.Common.Exceptions;
 using FBS.Domain.Repositories;
 using FBS.Domain.Reservation;
-using FBS.Domain.Reservation.Exceptions;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.CancelReservation;
 
-public class CancelReservationHandler : IRequestHandler<CancelReservationCommand, Result>
+public class CancelReservationCommandHandler : IRequestHandler<CancelReservationCommand, Result>
 {
     private readonly IReservationRepository _reservationRepository;
     private readonly IFlightRepository _flightRepository;
-    private readonly ILogger<CancelReservationHandler> _logger;
+    private readonly ILogger<CancelReservationCommandHandler> _logger;
 
-    public CancelReservationHandler(
+    public CancelReservationCommandHandler(
         IReservationRepository reservationRepository,
         IFlightRepository flightRepository,
-        ILogger<CancelReservationHandler> logger)
+        ILogger<CancelReservationCommandHandler> logger)
     {
         _reservationRepository = reservationRepository;
         _flightRepository = flightRepository;
@@ -49,13 +49,11 @@ public class CancelReservationHandler : IRequestHandler<CancelReservationCommand
             reservation.Cancel();
             flight.ReleaseSeat(reservation.SeatNumber);
         }
-        catch (InvalidReservationStateException ex)
+        catch (BusinessRuleValidationException ex)
         {
-            return Result.Conflict(ex.Message, ex);
-        }
-        catch (SeatNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "Seat {SeatNumber} not found when cancelling reservation {ReservationId}", reservation.SeatNumber, reservationId);
+            _logger.LogWarning(ex, "Business rule validation failed: {RuleName} ({ErrorType})", ex.BrokenRule.GetType().Name, ex.RuleErrorType);
+            var errorType = ex.RuleErrorType.ToErrorType();
+            return Result.Failure(ex.Message, errorType, ex);
         }
 
         _logger.LogInformation("Reservation {ReservationId} cancelled", reservationId);
