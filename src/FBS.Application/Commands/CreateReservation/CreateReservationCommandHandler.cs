@@ -10,23 +10,16 @@ using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.CreateReservation;
 
-public class CreateReservationCommandHandler : IRequestHandler<CreateReservationCommand, Result<CreateReservationResponse>>
+public class CreateReservationCommandHandler(
+    IReservationRepository reservationRepository,
+    IFlightRepository flightRepository,
+    ILogger<CreateReservationCommandHandler> logger) : IRequestHandler<CreateReservationCommand, Result<CreateReservationResponse>>
 {
-    private readonly IReservationRepository _reservationRepository;
+    private readonly IReservationRepository _reservationRepository = reservationRepository;
 
-    private readonly IFlightRepository _flightRepository;
+    private readonly IFlightRepository _flightRepository = flightRepository;
 
-    private readonly ILogger<CreateReservationCommandHandler> _logger;
-
-    public CreateReservationCommandHandler(
-        IReservationRepository reservationRepository,
-        IFlightRepository flightRepository,
-        ILogger<CreateReservationCommandHandler> logger)
-    {
-        _reservationRepository = reservationRepository;
-        _flightRepository = flightRepository;
-        _logger = logger;
-    }
+    private readonly ILogger<CreateReservationCommandHandler> _logger = logger;
 
     public async Task<Result<CreateReservationResponse>> Handle(CreateReservationCommand request, CancellationToken cancellationToken)
     {
@@ -60,7 +53,7 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
             return Result.Failure<CreateReservationResponse>(ex.Message, errorType, ex);
         }
 
-        var reservation = Reservation.Create(flight.Id, seatNumber, passengerInfo);
+        var reservation = Reservation.Create(flight.Id, flight.Number, seatNumber, passengerInfo);
         await _reservationRepository.AddAsync(reservation, cancellationToken);
 
         _logger.LogInformation("Reservation {ReservationId} created successfully", reservation.Id);
