@@ -9,21 +9,14 @@ using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.CancelReservation;
 
-public class CancelReservationCommandHandler : IRequestHandler<CancelReservationCommand, Result>
+public class CancelReservationCommandHandler(
+    IReservationRepository reservationRepository,
+    IFlightRepository flightRepository,
+    ILogger<CancelReservationCommandHandler> logger) : IRequestHandler<CancelReservationCommand, Result>
 {
-    private readonly IReservationRepository _reservationRepository;
-    private readonly IFlightRepository _flightRepository;
-    private readonly ILogger<CancelReservationCommandHandler> _logger;
-
-    public CancelReservationCommandHandler(
-        IReservationRepository reservationRepository,
-        IFlightRepository flightRepository,
-        ILogger<CancelReservationCommandHandler> logger)
-    {
-        _reservationRepository = reservationRepository;
-        _flightRepository = flightRepository;
-        _logger = logger;
-    }
+    private readonly IReservationRepository _reservationRepository = reservationRepository;
+    private readonly IFlightRepository _flightRepository = flightRepository;
+    private readonly ILogger<CancelReservationCommandHandler> _logger = logger;
 
     public async Task<Result> Handle(CancelReservationCommand request, CancellationToken cancellationToken)
     {

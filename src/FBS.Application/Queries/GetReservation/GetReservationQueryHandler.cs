@@ -5,18 +5,12 @@ using MediatR;
 
 namespace FBS.Application.Queries.GetReservation;
 
-public class GetReservationQueryHandler : IRequestHandler<GetReservationQuery, Result<ReservationDetailsDto>>
+public class GetReservationQueryHandler(
+    IReservationRepository reservationRepository,
+    IFlightRepository flightRepository) : IRequestHandler<GetReservationQuery, Result<ReservationDetailsDto>>
 {
-    private readonly IReservationRepository _reservationRepository;
-    private readonly IFlightRepository _flightRepository;
-
-    public GetReservationQueryHandler(
-        IReservationRepository reservationRepository,
-        IFlightRepository flightRepository)
-    {
-        _reservationRepository = reservationRepository;
-        _flightRepository = flightRepository;
-    }
+    private readonly IReservationRepository _reservationRepository = reservationRepository;
+    private readonly IFlightRepository _flightRepository = flightRepository;
 
     public async Task<Result<ReservationDetailsDto>> Handle(GetReservationQuery request, CancellationToken cancellationToken)
     {

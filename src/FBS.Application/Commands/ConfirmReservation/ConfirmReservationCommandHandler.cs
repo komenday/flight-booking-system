@@ -8,18 +8,12 @@ using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.ConfirmReservation;
 
-public class ConfirmReservationCommandHandler : IRequestHandler<ConfirmReservationCommand, Result>
+public class ConfirmReservationCommandHandler(
+    IReservationRepository reservationRepository,
+    ILogger<ConfirmReservationCommandHandler> logger) : IRequestHandler<ConfirmReservationCommand, Result>
 {
-    private readonly IReservationRepository _reservationRepository;
-    private readonly ILogger<ConfirmReservationCommandHandler> _logger;
-
-    public ConfirmReservationCommandHandler(
-        IReservationRepository reservationRepository,
-        ILogger<ConfirmReservationCommandHandler> logger)
-    {
-        _reservationRepository = reservationRepository;
-        _logger = logger;
-    }
+    private readonly IReservationRepository _reservationRepository = reservationRepository;
+    private readonly ILogger<ConfirmReservationCommandHandler> _logger = logger;
 
     public async Task<Result> Handle(ConfirmReservationCommand request, CancellationToken cancellationToken)
     {

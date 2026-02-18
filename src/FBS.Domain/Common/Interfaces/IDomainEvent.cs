@@ -8,3 +8,11 @@ public interface IDomainEvent : INotification
 
     DateTime OccurredAt { get; }
 }
+
+public interface IExternalDomainEvent : IDomainEvent
+{
+}
+
+public interface IInternalDomainEvent : IDomainEvent
+{
+}
