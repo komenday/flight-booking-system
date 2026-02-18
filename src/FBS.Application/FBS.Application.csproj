@@ -20,5 +20,5 @@
   <ItemGroup>
     <EditorConfigFiles Remove="C:\Projects\flight-booking-system\src\FBS.Application\Common\Result\.editorconfig" />
   </ItemGroup>
-
+	
 </Project>

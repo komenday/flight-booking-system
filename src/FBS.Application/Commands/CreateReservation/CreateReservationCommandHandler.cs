@@ -1,6 +1,7 @@
 ﻿using FBS.Application.Common.Result;
 using FBS.Application.Extensions;
 using FBS.Domain.Common.Exceptions;
+using FBS.Domain.Common.Specifications;
 using FBS.Domain.Flight;
 using FBS.Domain.Repositories;
 using FBS.Domain.Reservation;
@@ -29,14 +30,15 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
 
     public async Task<Result<CreateReservationResponse>> Handle(CreateReservationCommand request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Creating reservation for flight {FlightId}, seat {SeatNumber}", request.FlightId, request.SeatNumber);
+        _logger.LogInformation("Creating reservation for flight {FlightNumber}, seat {SeatNumber}", request.FlightNumber, request.SeatNumber);
 
-        var flightId = FlightId.From(request.FlightId);
-        var flight = await _flightRepository.GetByIdAsync(flightId, cancellationToken);
+        var flightNumber = FlightNumber.From(request.FlightNumber);
+        var spec = new FlightByNumberWithSeatsSpecification(flightNumber);
+        var flight = await _flightRepository.GetFirstOrDefaultAsync(spec, cancellationToken);
 
         if (flight is null)
         {
-            return Result.NotFound<CreateReservationResponse>($"Flight with ID {request.FlightId} was not found");
+            return Result.NotFound<CreateReservationResponse>($"Flight with flight number {request.FlightNumber} was not found");
         }
 
         var seatNumber = SeatNumber.From(request.SeatNumber);
