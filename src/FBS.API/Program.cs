@@ -1,6 +1,7 @@
 using FBS.Application;
 using FBS.Infrastructure;
 using FBS.Infrastructure.BackgroundJobs;
+using FBS.Infrastructure.Events;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Seed;
 using Hangfire;
@@ -23,6 +24,27 @@ builder.Services.AddSwaggerGen(options =>
         Description = "API for flight seat reservations"
     });
 });
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFBNS", policy =>
+    {
+        policy.WithOrigins("https://localhost:5002")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+builder.Services.AddHttpClient("FBNS", client =>
+{
+    var fbnsUrl = builder.Configuration["EventPublisher:FBNS:BaseUrl"];
+    var apiKey = builder.Configuration["EventPublisher:FBNS:ApiKey"];
+
+    client.BaseAddress = new Uri(fbnsUrl!);
+    client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddTransient<IEventPublisher, HttpEventPublisher>();
 
 var app = builder.Build();
 
@@ -54,7 +76,7 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 ConfigureRecurringJobs();
 
 app.UseExceptionHandler(options => { });
-
+app.UseCors("AllowFBNS");
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

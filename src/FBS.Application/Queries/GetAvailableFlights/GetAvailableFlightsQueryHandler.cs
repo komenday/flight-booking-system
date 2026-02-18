@@ -6,14 +6,9 @@ using MediatR;
 
 namespace FBS.Application.Queries.GetAvailableFlights;
 
-public class GetAvailableFlightsQueryHandler : IRequestHandler<GetAvailableFlightsQuery, Result<List<FlightSummaryDto>>>
+public class GetAvailableFlightsQueryHandler(IFlightRepository flightRepository) : IRequestHandler<GetAvailableFlightsQuery, Result<List<FlightSummaryDto>>>
 {
-    private readonly IFlightRepository _flightRepository;
-
-    public GetAvailableFlightsQueryHandler(IFlightRepository flightRepository)
-    {
-        _flightRepository = flightRepository;
-    }
+    private readonly IFlightRepository _flightRepository = flightRepository;
 
     public async Task<Result<List<FlightSummaryDto>>> Handle(GetAvailableFlightsQuery request, CancellationToken cancellationToken)
     {

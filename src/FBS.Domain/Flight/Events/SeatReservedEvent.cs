@@ -2,7 +2,7 @@
 
 namespace FBS.Domain.Flight.Events;
 
-public record SeatReservedEvent : DomainEventBase
+public record SeatReservedEvent : InternalDomainEventBase
 {
     public SeatReservedEvent(
         FlightId flightId,

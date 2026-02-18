@@ -6,18 +6,14 @@ using Microsoft.Extensions.Logging;
 
 namespace FBS.Application.Commands.ExpireReservation;
 
-public class ExpireReservationCommandHandler : IRequestHandler<ExpireReservationCommand, Result>
+public class ExpireReservationCommandHandler(
+    IFlightRepository flightRepository,
+    IReservationRepository reservationRepository,
+    ILogger<ExpireReservationCommandHandler> logger) : IRequestHandler<ExpireReservationCommand, Result>
 {
-    private readonly IReservationRepository _reservationRepository;
-    private readonly ILogger<ExpireReservationCommandHandler> _logger;
-
-    public ExpireReservationCommandHandler(
-        IReservationRepository reservationRepository,
-        ILogger<ExpireReservationCommandHandler> logger)
-    {
-        _reservationRepository = reservationRepository;
-        _logger = logger;
-    }
+    private readonly IFlightRepository _flightRepository = flightRepository;
+    private readonly IReservationRepository _reservationRepository = reservationRepository;
+    private readonly ILogger<ExpireReservationCommandHandler> _logger = logger;
 
     public async Task<Result> Handle(ExpireReservationCommand request, CancellationToken cancellationToken)
     {
@@ -32,9 +28,19 @@ public class ExpireReservationCommandHandler : IRequestHandler<ExpireReservation
             return Result.Success();
         }
 
-        reservation.Expire();
+        var flight = await _flightRepository.GetByIdAsync(reservation.FlightId, cancellationToken);
 
-        _logger.LogInformation("Reservation {ReservationId} successfully expired", reservationId);
+        if (flight is null)
+        {
+            _logger.LogError("Flight {FlightId} not found for reservation {ReservationId}", reservation.FlightId.Value, request.ReservationId);
+            return Result.NotFound($"Flight {reservation.FlightId.Value} not found");
+        }
+
+        reservation.Expire();
+        flight.ReleaseSeat(reservation.SeatNumber);
+
+        _logger.LogInformation("Reservation {ReservationId} expired and seat {SeatNumber} released on flight {FlightId}",
+            reservationId.Value, reservation.SeatNumber.Value, reservation.FlightId.Value);
 
         return Result.Success();
     }

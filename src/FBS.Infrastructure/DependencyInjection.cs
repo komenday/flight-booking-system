@@ -1,7 +1,9 @@
-﻿using FBS.Application.Common.Interfaces;
-using FBS.Domain.Repositories;
+﻿using FBS.Domain.Repositories;
 using FBS.Domain.Services;
 using FBS.Infrastructure.BackgroundJobs;
+using FBS.Infrastructure.EventDispatcher;
+using FBS.Infrastructure.Events;
+using FBS.Infrastructure.OptionsValidators;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Persistence.Repositories;
 using FBS.Infrastructure.Seed;
@@ -11,6 +13,11 @@ using Hangfire.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Extensions.Http;
+using Polly.Retry;
 
 namespace FBS.Infrastructure;
 
@@ -41,6 +48,10 @@ public static class DependencyInjection
             }
         });
 
+        services.AddScoped(serviceProvider =>
+            new Lazy<IDomainEventDispatcher>(() =>
+                serviceProvider.GetRequiredService<IDomainEventDispatcher>()));
+
         services.AddScoped<IFlightRepository, FlightRepository>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -48,6 +59,23 @@ public static class DependencyInjection
         services.AddScoped<IExecutionStrategy, EfCoreExecutionStrategy>();
 
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.AddScoped<IEventPublisher, HttpEventPublisher>();
+
+        services.Configure<EventPublisherOptions>(
+            configuration.GetSection(EventPublisherOptions.SectionName));
+
+        services.AddSingleton<IValidateOptions<EventPublisherOptions>, EventPublisherOptionsValidator>();
+
+        services.AddHttpClient<FbnsHttpClient>((serviceProvider, httpClient) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<EventPublisherOptions>>().Value;
+
+            httpClient.BaseAddress = new Uri(options.BaseUrl);
+            httpClient.DefaultRequestHeaders.Add("X-API-Key", options.ApiKey);
+            httpClient.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        })
+        .AddPolicyHandler(GetRetryPolicy())
+        .AddPolicyHandler(GetCircuitBreakerPolicy());
 
         services.AddHangfire(config => config
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
@@ -75,5 +103,28 @@ public static class DependencyInjection
         services.AddScoped<FlightDataSeeder>();
 
         return services;
+    }
+
+    private static AsyncRetryPolicy<HttpResponseMessage> GetRetryPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (outcome, timespan, retryAttempt, context) =>
+                {
+                    // Logging handled in HttpEventPublisher
+                });
+    }
+
+    private static AsyncCircuitBreakerPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .CircuitBreakerAsync(
+                handledEventsAllowedBeforeBreaking: 5,
+                durationOfBreak: TimeSpan.FromSeconds(30)
+            );
     }
 }
