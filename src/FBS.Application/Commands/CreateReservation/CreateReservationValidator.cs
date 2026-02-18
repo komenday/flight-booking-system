@@ -7,9 +7,9 @@ public class CreateReservationValidator : AbstractValidator<CreateReservationCom
 {
     public CreateReservationValidator()
     {
-        RuleFor(x => x.FlightId)
+        RuleFor(x => x.FlightNumber)
             .NotEmpty()
-            .WithMessage("Flight ID is required");
+            .WithMessage("Flight number is required");
 
         RuleFor(x => x.SeatNumber)
             .NotEmpty()
