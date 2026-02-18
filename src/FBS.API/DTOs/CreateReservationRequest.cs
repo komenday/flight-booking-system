@@ -1,7 +1,7 @@
 ﻿namespace FBS.API.DTOs;
 
 public record CreateReservationRequest(
-    Guid FlightId,
+    string FlightNumber,
     string SeatNumber,
     string FirstName,
     string LastName,

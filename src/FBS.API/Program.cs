@@ -53,6 +53,8 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 
 ConfigureRecurringJobs();
 
+app.UseExceptionHandler(options => { });
+
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

@@ -53,8 +53,8 @@ public class Flight : AggregateRoot<FlightId>
 
         this.CheckRules(
             new CannotReserveSeatOnDepartedFlightRule(DepartureTime),
-            new SeatMustExistRule(seat is not null, Number, seatNumber),
-            new SeatMustBeAvailableRule(seat?.IsAvailable ?? false, Number, seatNumber)
+            new SeatMustExistRule(seat, Number, seatNumber),
+            new SeatMustBeAvailableRule(seat, Number, seatNumber)
         );
 
         seat!.Reserve();
@@ -66,7 +66,7 @@ public class Flight : AggregateRoot<FlightId>
     {
         var seat = _seats.FirstOrDefault(s => s.Number == seatNumber);
 
-        this.CheckRule(new SeatMustExistRule(seat is not null, Number, seatNumber));
+        this.CheckRule(new SeatMustExistRule(seat, Number, seatNumber));
 
         seat!.Release();
 

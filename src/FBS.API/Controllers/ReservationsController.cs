@@ -14,7 +14,7 @@ public class ReservationsController(IMediator mediator) : ApiControllerBase
 {
     private readonly IMediator _mediator = mediator;
 
-    [HttpGet("{id}")]
+    [HttpGet("get/{id}")]
     [ProducesResponseType(typeof(ReservationDetailsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -29,7 +29,7 @@ public class ReservationsController(IMediator mediator) : ApiControllerBase
             : MapErrorToResponse(result.ErrorType, result.Error!);
     }
 
-    [HttpPost]
+    [HttpPost("create")]
     [ProducesResponseType(typeof(CreateReservationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -38,7 +38,7 @@ public class ReservationsController(IMediator mediator) : ApiControllerBase
     public async Task<IActionResult> CreateReservation([FromBody] CreateReservationRequest request, CancellationToken cancellationToken)
     {
         var command = new CreateReservationCommand(
-            request.FlightId,
+            request.FlightNumber,
             request.SeatNumber,
             new PassengerInfoDto(
                 request.FirstName,
@@ -58,7 +58,7 @@ public class ReservationsController(IMediator mediator) : ApiControllerBase
             : MapErrorToResponse(result.ErrorType, result.Error!);
     }
 
-    [HttpPut("{id}/confirm")]
+    [HttpPut("confirm/{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -74,7 +74,7 @@ public class ReservationsController(IMediator mediator) : ApiControllerBase
             : MapErrorToResponse(result.ErrorType, result.Error!);
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("cancel/{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
