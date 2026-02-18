@@ -26,6 +26,14 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
                 value => FlightId.From(value))
             .IsRequired();
 
+        builder.Property(r => r.FlightNumber)
+            .HasConversion(
+                fn => fn.Value,
+                value => FlightNumber.From(value))
+            .HasColumnName("FlightNumber")
+            .HasMaxLength(10)
+            .IsRequired();
+
         builder.Property(r => r.SeatNumber)
             .HasConversion(
                 sn => sn.Value,

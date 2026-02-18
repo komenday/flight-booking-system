@@ -6,14 +6,9 @@ using MediatR;
 
 namespace FBS.Application.Queries.GetFlightByNumber;
 
-public class GetFlightByNumberQueryHandler : IRequestHandler<GetFlightByNumberQuery, Result<FlightDetailsDto>>
+public class GetFlightByNumberQueryHandler(IFlightRepository flightRepository) : IRequestHandler<GetFlightByNumberQuery, Result<FlightDetailsDto>>
 {
-    private readonly IFlightRepository _flightRepository;
-
-    public GetFlightByNumberQueryHandler(IFlightRepository flightRepository)
-    {
-        _flightRepository = flightRepository;
-    }
+    private readonly IFlightRepository _flightRepository = flightRepository;
 
     public async Task<Result<FlightDetailsDto>> Handle(GetFlightByNumberQuery request, CancellationToken cancellationToken)
     {

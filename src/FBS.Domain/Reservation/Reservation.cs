@@ -9,6 +9,8 @@ public class Reservation : AggregateRoot<ReservationId>
 {
     public FlightId FlightId { get; private set; } = null!;
 
+    public FlightNumber FlightNumber { get; private set; } = null!;
+
     public SeatNumber SeatNumber { get; private set; } = null!;
 
     public PassengerInfo Passenger { get; private set; } = null!;
@@ -34,10 +36,12 @@ public class Reservation : AggregateRoot<ReservationId>
 
     public static Reservation Create(
         FlightId flightId,
+        FlightNumber flightNumber,
         SeatNumber seatNumber,
         PassengerInfo passenger)
     {
         ArgumentNullException.ThrowIfNull(flightId);
+        ArgumentNullException.ThrowIfNull(flightNumber);
         ArgumentNullException.ThrowIfNull(seatNumber);
         ArgumentNullException.ThrowIfNull(passenger);
 
@@ -45,6 +49,7 @@ public class Reservation : AggregateRoot<ReservationId>
         {
             Id = ReservationId.New(),
             FlightId = flightId,
+            FlightNumber = flightNumber,
             SeatNumber = seatNumber,
             Passenger = passenger,
             Status = ReservationStatus.Pending,
@@ -55,7 +60,9 @@ public class Reservation : AggregateRoot<ReservationId>
         reservation.AddDomainEvent(new ReservationCreatedEvent(
             reservation.Id,
             reservation.FlightId,
+            reservation.FlightNumber,
             reservation.SeatNumber,
+            reservation.Passenger,
             reservation.ExpiresAt
         ));
 
@@ -72,7 +79,13 @@ public class Reservation : AggregateRoot<ReservationId>
         Status = ReservationStatus.Confirmed;
         ConfirmedAt = DateTime.UtcNow;
 
-        AddDomainEvent(new ReservationConfirmedEvent(Id));
+        AddDomainEvent(new ReservationConfirmedEvent(
+            Id,
+            FlightId,
+            FlightNumber,
+            SeatNumber,
+            Passenger
+        ));
     }
 
     public void Cancel()
@@ -81,7 +94,13 @@ public class Reservation : AggregateRoot<ReservationId>
 
         Status = ReservationStatus.Cancelled;
 
-        AddDomainEvent(new ReservationCancelledEvent(Id, FlightId, SeatNumber));
+        AddDomainEvent(new ReservationCancelledEvent(
+            Id,
+            FlightId,
+            FlightNumber,
+            SeatNumber,
+            Passenger
+        ));
     }
 
     public void Expire()
@@ -92,6 +111,12 @@ public class Reservation : AggregateRoot<ReservationId>
 
         Status = ReservationStatus.Expired;
 
-        AddDomainEvent(new ReservationExpiredEvent(Id, FlightId, SeatNumber));
+        AddDomainEvent(new ReservationExpiredEvent(
+            Id,
+            FlightId,
+            FlightNumber,
+            SeatNumber,
+            Passenger
+        ));
     }
 }
