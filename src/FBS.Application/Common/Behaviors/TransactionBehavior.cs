@@ -1,4 +1,5 @@
 ﻿using FBS.Domain.Repositories;
+using FBS.Domain.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -6,10 +7,13 @@ using Microsoft.Extensions.Logging;
 namespace FBS.Application.Common.Behaviors;
 
 public class TransactionBehavior<TRequest, TResponse>
-    (IUnitOfWork unitOfWork, ILogger<TransactionBehavior<TRequest, TResponse>> logger)
+    (IUnitOfWork unitOfWork,
+     IExecutionStrategy executionStrategy,
+     ILogger<TransactionBehavior<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse> where TRequest : IRequest<TResponse>
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly IExecutionStrategy _executionStrategy = executionStrategy;
     private readonly ILogger<TransactionBehavior<TRequest, TResponse>> _logger = logger;
 
     public async Task<TResponse> Handle(
@@ -26,47 +30,50 @@ public class TransactionBehavior<TRequest, TResponse>
 
         _logger.LogInformation("Beginning transaction for {RequestName}", requestName);
 
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-
-        try
+        return await _executionStrategy.ExecuteAsync(async () =>
         {
-            var response = await next(cancellationToken);
-
-            if (!IsSuccessResult(response))
-            {
-                _logger.LogWarning("Rolling back transaction for {RequestName} - operation returned failure result", requestName);
-
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return response;
-            }
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
             try
             {
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                var response = await next(cancellationToken);
+
+                if (!IsSuccessResult(response))
+                {
+                    _logger.LogWarning("Rolling back transaction for {RequestName} - operation returned failure result", requestName);
+
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return response;
+                }
+
+                try
+                {
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException ex)
+                {
+                    _logger.LogWarning(ex, "Concurrency conflict in {RequestName} - rolling back transaction", requestName);
+
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+
+                    return CreateConcurrencyFailureResult<TResponse>(
+                        "A concurrency conflict occurred. The resource was modified by another user. Please retry.");
+                }
+
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                _logger.LogInformation("Committed transaction for {RequestName}", requestName);
+
+                return response;
+
             }
-            catch (DbUpdateConcurrencyException ex)
+            catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Concurrency conflict in {RequestName} - rolling back transaction", requestName);
-
+                _logger.LogError(ex, "Rolling back transaction for {RequestName} due to exception", requestName);
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-
-                return CreateConcurrencyFailureResult<TResponse>(
-                    "A concurrency conflict occurred. The resource was modified by another user. Please retry.");
+                throw;
             }
-
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            _logger.LogInformation("Committed transaction for {RequestName}", requestName);
-
-            return response;
-
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Rolling back transaction for {RequestName} due to exception", requestName);
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+        }, cancellationToken);
     }
 
     private static bool IsQuery(string requestName)

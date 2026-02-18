@@ -12,7 +12,7 @@ public class FlightDataSeeder(ApplicationDbContext context, ILogger<FlightDataSe
     private readonly ILogger<FlightDataSeeder> _logger = logger;
 
     private static readonly string[] Airports 
-        = ["JFK", "LAX", "ORD", "DFW", "DEN", "SFO", "SEA", "LAS", "MCO", "MIA", "ATL", "BOS", "PHX"];
+        = ["JFK", "LAX", "ORD", "DXB", "CDG", "AMS", "FRA", "DFW", "IST", "BCN", "ATL", "LAS", "HKG"];
 
     private static readonly string[] Airlines 
         = ["AA", "UA", "DL", "SW", "B6", "AS", "NK", "F9"];

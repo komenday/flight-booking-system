@@ -45,7 +45,8 @@ public static class DependencyInjection
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        services.AddScoped<IFlightProviderService, FlightProviderService>();
+        services.AddScoped<IExecutionStrategy, EfCoreExecutionStrategy>();
+
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
         services.AddHangfire(config => config
