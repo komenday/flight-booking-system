@@ -12,6 +12,7 @@ A robust .NET-based flight reservation system implementing Domain-Driven Design 
 - [Architecture](#-architecture)
 - [Technologies](#-technologies)
 - [Getting Started](#-getting-started)
+- [Project Structure](#-project-structure)
 - [API Endpoints](#-api-endpoints)
 - [Domain Model](#-domain-model)
 - [Configuration](#-configuration)
@@ -147,6 +148,66 @@ curl -X POST https://localhost:5001/api/reservations \
     "passengerLastName": "Doe",
     "passengerEmail": "john.doe@example.com"
   }'
+```
+
+## 📁 Project Structure
+
+```
+src/
+├── FBS.API/                    # Presentation Layer
+│   ├── Controllers/            # API endpoints
+│   ├── Middleware/             # Custom middleware
+│   └── Program.cs              # Application entry point
+│
+├── FBS.Application/            # Application Layer
+│   ├── Commands/               # Write operations
+│   │   ├── CreateReservation/
+│   │   ├── ConfirmReservation/
+│   │   ├── CancelReservation/
+│   │   └── ExpireReservation/
+│   ├── Queries/                # Read operations
+│   │   ├── GetAvailableFlights/
+│   │   ├── GetFlightByNumber/
+│   │   └── GetReservation/
+│   ├── Common/                 # Shared application logic
+│   │   ├── Behaviors/          # MediatR pipeline behaviors
+│   │   └── Result/             # Result pattern implementation
+│   └── EventHandlers/          # Domain event handlers
+│
+├── FBS.Domain/                 # Domain Layer
+│   ├── Flight/                 # Flight aggregate
+│   │   ├── Flight.cs           # Aggregate root
+│   │   ├── FlightId.cs         # Value object
+│   │   ├── FlightNumber.cs     # Value object
+│   │   ├── SeatNumber.cs       # Value object
+│   │   ├── Events/             # Domain events
+│   │   └── Rules/              # Business rules
+│   ├── Reservation/            # Reservation aggregate
+│   │   ├── Reservation.cs      # Aggregate root
+│   │   ├── ReservationId.cs    # Value object
+│   │   ├── ReservationStatus.cs # Enumeration
+│   │   ├── Events/             # Domain events
+│   │   └── Rules/              # Business rules
+│   ├── SharedKernel/           # Shared value objects
+│   │   ├── Email.cs
+│   │   └── PassengerInfo.cs
+│   ├── Common/                 # Domain infrastructure
+│   │   ├── Base/               # Base classes
+│   │   └── Interfaces/         # Domain interfaces
+│   ├── Repositories/           # Repository interfaces
+│   └── Services/               # Domain services
+│
+└── FBS.Infrastructure/         # Infrastructure Layer
+    ├── Persistence/            # Data access
+    │   ├── ApplicationDbContext.cs
+    │   ├── Configurations/     # EF Core configurations
+    │   ├── Repositories/       # Repository implementations
+    │   └── Migrations/         # Database migrations
+    ├── EventDispatcher/        # Domain event dispatcher
+    ├── Events/                 # External event publisher
+    ├── BackgroundJobs/         # Hangfire jobs
+    ├── Services/               # Infrastructure services
+    └── Seed/                   # Database seeding
 ```
 
 ## 🔌 API Endpoints
