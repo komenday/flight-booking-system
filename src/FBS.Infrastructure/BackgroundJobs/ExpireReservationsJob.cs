@@ -16,7 +16,7 @@ public class ExpireReservationsJob(
     private readonly ISender _sender = sender;
     private readonly ILogger<ExpireReservationsJob> _logger = logger;
 
-    private const int MaxDegreeOfParallelism = 10;
+    private const int MaxConcurrency = 10;
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
@@ -35,44 +35,46 @@ public class ExpireReservationsJob(
 
             _logger.LogInformation("Found {Count} expired reservations to process", expiredReservations.Count());
 
+            using var semaphore = new SemaphoreSlim(MaxConcurrency);
+
             var processedCount = 0;
             var failedCount = 0;
             var failedReservations = new ConcurrentBag<(Guid ReservationId, string Error)>();
 
-            var parallelOptions = new ParallelOptions
+            var tasks = expiredReservations.Select(async reservation =>
             {
-                MaxDegreeOfParallelism = MaxDegreeOfParallelism,
-                CancellationToken = cancellationToken
-            };
+                await semaphore.WaitAsync(cancellationToken);
 
-            await Parallel.ForEachAsync(expiredReservations, parallelOptions,
-                async (reservation, ct) =>
+                try
                 {
-                    try
-                    {
-                        var command = new ExpireReservationCommand(reservation.Id.Value);
-                        var result = await _sender.Send(command, cancellationToken);
+                    var command = new ExpireReservationCommand(reservation.Id.Value);
+                    var result = await _sender.Send(command, cancellationToken);
 
-                        if (result.IsSuccess)
-                        {
-                            Interlocked.Increment(ref processedCount);
-                            _logger.LogDebug("Successfully expired reservation {ReservationId}", reservation.Id.Value);
-                        }
-                        else
-                        {
-                            Interlocked.Increment(ref failedCount);
-                            failedReservations.Add((reservation.Id.Value, result.Error ?? "Unknown error"));
-                            _logger.LogWarning("Failed to expire reservation {ReservationId}: {Error}", reservation.Id.Value, result.Error);
-                        }
+                    if (result.IsSuccess)
+                    {
+                        Interlocked.Increment(ref processedCount);
+                        _logger.LogDebug("Successfully expired reservation {ReservationId}", reservation.Id.Value);
                     }
-                    catch (Exception ex)
+                    else
                     {
                         Interlocked.Increment(ref failedCount);
-                        failedReservations.Add((reservation.Id.Value, ex.Message));
-                        _logger.LogError(ex, "Error processing expired reservation {ReservationId}", reservation.Id.Value);
+                        failedReservations.Add((reservation.Id.Value, result.Error ?? "Unknown error"));
+                        _logger.LogWarning("Failed to expire reservation {ReservationId}: {Error}", reservation.Id.Value, result.Error);
                     }
                 }
-            );
+                catch (Exception ex)
+                {
+                    Interlocked.Increment(ref failedCount);
+                    failedReservations.Add((reservation.Id.Value, ex.Message));
+                    _logger.LogError(ex, "Error processing {ReservationId}", reservation.Id.Value);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            await Task.WhenAll(tasks);
 
             _logger.LogInformation("ExpireReservationsJob completed. Processed: {ProcessedCount}, Failed: {FailedCount}", processedCount, failedCount);
         }

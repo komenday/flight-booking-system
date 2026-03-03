@@ -27,7 +27,7 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFBNS", policy =>
+    options.AddPolicy("AllowNotificationSystem", policy =>
     {
         policy.WithOrigins("https://localhost:5002")
               .AllowAnyHeader()
@@ -35,10 +35,10 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddHttpClient("FBNS", client =>
+builder.Services.AddHttpClient("NotificationSystem", client =>
 {
-    var fbnsUrl = builder.Configuration["EventPublisher:FBNS:BaseUrl"];
-    var apiKey = builder.Configuration["EventPublisher:FBNS:ApiKey"];
+    var fbnsUrl = builder.Configuration["EventPublisher:BaseUrl"];
+    var apiKey = builder.Configuration["EventPublisher:ApiKey"];
 
     client.BaseAddress = new Uri(fbnsUrl!);
     client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
@@ -76,7 +76,7 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 ConfigureRecurringJobs();
 
 app.UseExceptionHandler(options => { });
-app.UseCors("AllowFBNS");
+app.UseCors("AllowNotificationSystem");
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

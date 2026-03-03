@@ -65,27 +65,22 @@ public class DomainEventDispatcher(
 
         if (externalEvents.Count != 0)
         {
-            _logger.LogDebug("Publishing {Count} events externally (fire-and-forget)", externalEvents.Count);
+            _logger.LogDebug("Publishing {Count} events externally", externalEvents.Count);
 
-            var externalPublishTasks = externalEvents.Select(domainEvent =>
+            var externalTasks = externalEvents.Select(async domainEvent =>
             {
-                _ = Task.Run(async () =>
+                try
                 {
-                    try
-                    {
-                        _logger.LogDebug("Publishing event externally: {EventType}", domainEvent.GetType().Name);
-                        await _eventPublisher.PublishAsync(domainEvent, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to publish event {EventType} externally", domainEvent.GetType().Name);
-                    }
-                }, cancellationToken);
-
-                return Task.CompletedTask;
+                    _logger.LogDebug("Publishing event externally: {EventType}", domainEvent.GetType().Name);
+                    await _eventPublisher.PublishAsync(domainEvent, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to publish {EventType}", domainEvent.GetType().Name);
+                }
             });
 
-            _ = Task.WhenAll(externalPublishTasks);
+            await Task.WhenAll(externalTasks);
         }
 
         _logger.LogInformation("Domain events dispatched successfully");
