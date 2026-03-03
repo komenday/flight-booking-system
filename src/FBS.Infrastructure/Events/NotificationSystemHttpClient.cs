@@ -3,10 +3,10 @@ using System.Net.Http.Json;
 
 namespace FBS.Infrastructure.Events;
 
-public class FbnsHttpClient(HttpClient httpClient, ILogger<FbnsHttpClient> logger)
+public class NotificationSystemHttpClient(HttpClient httpClient, ILogger<NotificationSystemHttpClient> logger)
 {
     private readonly HttpClient _httpClient = httpClient;
-    private readonly ILogger<FbnsHttpClient> _logger = logger;
+    private readonly ILogger<NotificationSystemHttpClient> _logger = logger;
 
     public async Task<HttpResponseMessage> PostEventAsync<TEvent>(string endpoint, TEvent @event, CancellationToken cancellationToken)
     {
