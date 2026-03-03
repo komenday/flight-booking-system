@@ -6,10 +6,10 @@ using Microsoft.Extensions.Logging;
 namespace FBS.Infrastructure.Events;
 
 public class HttpEventPublisher(
-    FbnsHttpClient fbnsClient,
+    NotificationSystemHttpClient fbnsClient,
     ILogger<HttpEventPublisher> logger) : IEventPublisher
 {
-    private readonly FbnsHttpClient _fbnsClient = fbnsClient;
+    private readonly NotificationSystemHttpClient _fbnsClient = fbnsClient;
     private readonly ILogger<HttpEventPublisher> _logger = logger;
 
     public async Task PublishAsync<TEvent>(TEvent @event,CancellationToken cancellationToken)

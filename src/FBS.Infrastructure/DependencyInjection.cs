@@ -66,7 +66,7 @@ public static class DependencyInjection
 
         services.AddSingleton<IValidateOptions<EventPublisherOptions>, EventPublisherOptionsValidator>();
 
-        services.AddHttpClient<FbnsHttpClient>((serviceProvider, httpClient) =>
+        services.AddHttpClient<NotificationSystemHttpClient>((serviceProvider, httpClient) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<EventPublisherOptions>>().Value;
 
