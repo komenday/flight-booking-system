@@ -35,17 +35,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddHttpClient("NotificationSystem", client =>
-{
-    var fbnsUrl = builder.Configuration["EventPublisher:BaseUrl"];
-    var apiKey = builder.Configuration["EventPublisher:ApiKey"];
-
-    client.BaseAddress = new Uri(fbnsUrl!);
-    client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
-    client.Timeout = TimeSpan.FromSeconds(10);
-});
-builder.Services.AddTransient<IEventPublisher, HttpEventPublisher>();
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
