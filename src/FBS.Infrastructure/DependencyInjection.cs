@@ -74,8 +74,8 @@ public static class DependencyInjection
             httpClient.DefaultRequestHeaders.Add("X-API-Key", options.ApiKey);
             httpClient.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         })
-        .AddPolicyHandler(GetRetryPolicy())
-        .AddPolicyHandler(GetCircuitBreakerPolicy());
+        .AddPolicyHandler(GetCircuitBreakerPolicy())
+        .AddPolicyHandler(GetRetryPolicy());
 
         services.AddHangfire(config => config
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
@@ -111,20 +111,19 @@ public static class DependencyInjection
             .HandleTransientHttpError()
             .WaitAndRetryAsync(
                 retryCount: 3,
-                sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                onRetry: (outcome, timespan, retryAttempt, context) =>
-                {
-                    // Logging handled in HttpEventPublisher
-                });
+                sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))
+            );
     }
 
     private static AsyncCircuitBreakerPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
     {
         return HttpPolicyExtensions
             .HandleTransientHttpError()
-            .CircuitBreakerAsync(
-                handledEventsAllowedBeforeBreaking: 5,
-                durationOfBreak: TimeSpan.FromSeconds(30)
+            .AdvancedCircuitBreakerAsync(
+                failureThreshold: 0.5,
+                samplingDuration: TimeSpan.FromSeconds(60),
+                minimumThroughput: 5,
+                durationOfBreak: TimeSpan.FromSeconds(5)
             );
     }
 }
