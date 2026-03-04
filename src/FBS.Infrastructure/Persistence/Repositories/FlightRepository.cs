@@ -10,11 +10,23 @@ public class FlightRepository(ApplicationDbContext context) : IFlightRepository
 {
     private readonly ApplicationDbContext _context = context;
 
-    public async Task<Flight?> GetByIdAsync(FlightId id, CancellationToken cancellationToken)
+    public async ValueTask<Flight?> GetByIdAsync(FlightId id, CancellationToken cancellationToken)
     {
-        return await _context.Flights
-            .Include(f => f.Seats)
-            .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+        var localFlight = _context.Flights.Local.FirstOrDefault(f => f.Id == id);
+        if (localFlight is not null)
+        {
+            return localFlight;
+        }
+
+        var flight = await _context.Flights.FindAsync([id], cancellationToken);
+        if (flight is not null)
+        {
+            await _context.Entry(flight)
+                .Collection(f => f.Seats)
+                .LoadAsync(cancellationToken);
+        }
+
+        return flight;
     }
 
     public async Task<IReadOnlyList<Flight>> GetAsync(ISpecification<Flight> spec, CancellationToken cancellationToken)
@@ -29,14 +41,14 @@ public class FlightRepository(ApplicationDbContext context) : IFlightRepository
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task AddAsync(Flight flight, CancellationToken cancellationToken)
+    public async ValueTask AddAsync(Flight flight, CancellationToken cancellationToken)
     {
         await _context.Flights.AddAsync(flight, cancellationToken);
     }
 
-    public Task UpdateAsync(Flight flight, CancellationToken cancellationToken)
+    public ValueTask UpdateAsync(Flight flight, CancellationToken cancellationToken)
     {
         _context.Flights.Update(flight);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }
