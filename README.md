@@ -2,7 +2,7 @@
 
 A robust .NET-based flight reservation system implementing Domain-Driven Design (DDD) principles with Clean Architecture. Features real-time seat management, automated reservation expiration, and event-driven notifications.
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20DDD-green)](https://learn.microsoft.com/en-us/dotnet/architecture/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -78,9 +78,9 @@ A robust .NET-based flight reservation system implementing Domain-Driven Design 
 ## 🛠️ Technologies
 
 ### Core Stack
-- **.NET 8.0** - Latest LTS framework
-- **ASP.NET Core 8.0** - Web API framework
-- **Entity Framework Core 8.0** - ORM for database access
+- **.NET 10.0** - Latest LTS framework
+- **ASP.NET Core 10.0** - Web API framework
+- **Entity Framework Core 10.0** - ORM for database access
 - **SQL Server** - Relational database
 
 ### Libraries & Tools
@@ -451,7 +451,7 @@ docker run -d -p 5000:80 \
 
 ```bash
 # Publish to Azure
-az webapp up --name your-app-name --resource-group your-rg --runtime "DOTNETCORE:8.0"
+az webapp up --name your-app-name --resource-group your-rg --runtime "DOTNETCORE:10.0"
 ```
 
 ### Environment Variables
@@ -480,4 +480,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ using .NET 8.0 and Clean Architecture principles.
+Built with ❤️ using .NET 10 and Clean Architecture principles.
