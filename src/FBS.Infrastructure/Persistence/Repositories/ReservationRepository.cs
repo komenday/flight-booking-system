@@ -10,10 +10,15 @@ public class ReservationRepository(ApplicationDbContext context) : IReservationR
 {
     private readonly ApplicationDbContext _context = context;
 
-    public async Task<Reservation?> GetByIdAsync(ReservationId id, CancellationToken cancellationToken)
+    public async ValueTask<Reservation?> GetByIdAsync(ReservationId id, CancellationToken cancellationToken)
     {
-        return await _context.Reservations
-            .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+        var localReservation = _context.Reservations.Local.FirstOrDefault(r => r.Id == id);
+        if (localReservation is not null)
+        {
+            return localReservation;
+        }
+
+        return await _context.Reservations.FindAsync([id], cancellationToken);
     }
 
     public async Task<IReadOnlyList<Reservation>> GetAsync(ISpecification<Reservation> spec, CancellationToken cancellationToken)
@@ -28,14 +33,14 @@ public class ReservationRepository(ApplicationDbContext context) : IReservationR
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task AddAsync(Reservation reservation, CancellationToken cancellationToken)
+    public async ValueTask AddAsync(Reservation reservation, CancellationToken cancellationToken)
     {
         await _context.Reservations.AddAsync(reservation, cancellationToken);
     }
 
-    public Task UpdateAsync(Reservation reservation, CancellationToken cancellationToken)
+    public ValueTask UpdateAsync(Reservation reservation, CancellationToken cancellationToken)
     {
         _context.Reservations.Update(reservation);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }
