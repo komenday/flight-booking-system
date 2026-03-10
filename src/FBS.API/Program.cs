@@ -1,7 +1,6 @@
 using FBS.Application;
 using FBS.Infrastructure;
 using FBS.Infrastructure.BackgroundJobs;
-using FBS.Infrastructure.Events;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Seed;
 using Hangfire;
@@ -37,30 +36,28 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+using var scope = app.Services.CreateScope();
+var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+await dbContext.Database.MigrateAsync();
+
+var seeder = scope.ServiceProvider.GetRequiredService<FlightDataSeeder>();
+await seeder.SeedAsync(15);
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Flight Booking System API V1");
+    c.RoutePrefix = "swagger";
+});
+
 if (app.Environment.IsDevelopment())
 {
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-    await dbContext.Database.MigrateAsync();
-
-    var seeder = scope.ServiceProvider.GetRequiredService<FlightDataSeeder>();
-    await seeder.SeedAsync(15);
-
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Flight Booking System API V1");
-        c.RoutePrefix = "swagger";
+        Authorization = [new HangfireAuthorizationFilter()]
     });
 }
-
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = app.Environment.IsDevelopment()
-        ? new[] { new HangfireAuthorizationFilter() }
-        : throw new InvalidOperationException("Configure authorization for Hangfire Dashboard in production")
-});
 
 ConfigureRecurringJobs();
 
