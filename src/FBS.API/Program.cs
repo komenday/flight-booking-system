@@ -59,7 +59,16 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-ConfigureRecurringJobs();
+var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+recurringJobManager.AddOrUpdate<ExpireReservationsJob>(
+    "expire-reservations",
+    job => job.ExecuteAsync(CancellationToken.None),
+    "*/2 * * * *",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Utc
+    }
+);
 
 app.UseExceptionHandler(options => { });
 app.UseCors("AllowNotificationSystem");
@@ -74,18 +83,6 @@ if (app.Environment.IsDevelopment())
 }
 
 await app.RunAsync();
-
-static void ConfigureRecurringJobs()
-{
-    RecurringJob.AddOrUpdate<ExpireReservationsJob>(
-        "expire-reservations",
-        job => job.ExecuteAsync(CancellationToken.None),
-        "*/2 * * * *",
-        new RecurringJobOptions
-        {
-            TimeZone = TimeZoneInfo.Utc
-        });
-}
 
 public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
 {
