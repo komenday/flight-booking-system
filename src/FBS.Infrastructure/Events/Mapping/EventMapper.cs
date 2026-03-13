@@ -1,71 +1,82 @@
-﻿using FBS.Domain.Reservation.Events;
+﻿using FBS.Domain.Common.Interfaces;
+using FBS.Domain.Reservation.Events;
 using FBS.Infrastructure.Events.DTOs;
 
 namespace FBS.Infrastructure.Events.Mapping;
-public static class EventMapper
+
+public class EventMapper : IEventMapper
 {
-    public static ReservationCreatedEventDto ToDto(this ReservationCreatedEvent domainEvent)
+    private static readonly Dictionary<Type, Func<IExternalDomainEvent, object>> _mappers = [];
+
+    static EventMapper()
     {
-        return new ReservationCreatedEventDto
+        Register<ReservationCreatedEvent>(e => new ReservationCreatedEventDto
         {
-            EventId = domainEvent.EventId,
-            OccurredAt = domainEvent.OccurredAt,
-            ReservationId = domainEvent.ReservationId.Value,        
-            FlightId = domainEvent.FlightId.Value,                  
-            FlightNumber = domainEvent.FlightNumber.Value,          
-            SeatNumber = domainEvent.SeatNumber.Value,             
-            PassengerFirstName = domainEvent.Passenger.FirstName,   
-            PassengerLastName = domainEvent.Passenger.LastName,
-            PassengerEmail = domainEvent.Passenger.Email.Value,
-            ExpiresAt = domainEvent.ExpiresAt
-        };
+            EventId = e.EventId,
+            OccurredAt = e.OccurredAt,
+            ReservationId = e.ReservationId.Value,
+            FlightId = e.FlightId.Value,
+            FlightNumber = e.FlightNumber.Value,
+            SeatNumber = e.SeatNumber.Value,
+            PassengerFirstName = e.Passenger.FirstName,
+            PassengerLastName = e.Passenger.LastName,
+            PassengerEmail = e.Passenger.Email.Value,
+            ExpiresAt = e.ExpiresAt
+        });
+
+        Register<ReservationConfirmedEvent>(e => new ReservationConfirmedEventDto
+        {
+            EventId = e.EventId,
+            OccurredAt = e.OccurredAt,
+            ReservationId = e.ReservationId.Value,
+            FlightId = e.FlightId.Value,
+            FlightNumber = e.FlightNumber.Value,
+            SeatNumber = e.SeatNumber.Value,
+            PassengerFirstName = e.Passenger.FirstName,
+            PassengerLastName = e.Passenger.LastName,
+            PassengerEmail = e.Passenger.Email.Value
+        });
+
+        Register<ReservationCancelledEvent>(e => new ReservationCancelledEventDto
+        {
+            EventId = e.EventId,
+            OccurredAt = e.OccurredAt,
+            ReservationId = e.ReservationId.Value,
+            FlightId = e.FlightId.Value,
+            FlightNumber = e.FlightNumber.Value,
+            SeatNumber = e.SeatNumber.Value,
+            PassengerFirstName = e.Passenger.FirstName,
+            PassengerLastName = e.Passenger.LastName,
+            PassengerEmail = e.Passenger.Email.Value
+        });
+
+        Register<ReservationExpiredEvent>(e => new ReservationExpiredEventDto
+        {
+            EventId = e.EventId,
+            OccurredAt = e.OccurredAt,
+            ReservationId = e.ReservationId.Value,
+            FlightId = e.FlightId.Value,
+            FlightNumber = e.FlightNumber.Value,
+            SeatNumber = e.SeatNumber.Value,
+            PassengerFirstName = e.Passenger.FirstName,
+            PassengerLastName = e.Passenger.LastName,
+            PassengerEmail = e.Passenger.Email.Value
+        });
     }
 
-    public static ReservationConfirmedEventDto ToDto(this ReservationConfirmedEvent domainEvent)
+    public object MapToDto(IExternalDomainEvent domainEvent)
     {
-        return new ReservationConfirmedEventDto
-        {
-            EventId = domainEvent.EventId,
-            OccurredAt = domainEvent.OccurredAt,
-            ReservationId = domainEvent.ReservationId.Value,
-            FlightId = domainEvent.FlightId.Value,
-            FlightNumber = domainEvent.FlightNumber.Value,
-            SeatNumber = domainEvent.SeatNumber.Value,
-            PassengerFirstName = domainEvent.Passenger.FirstName,
-            PassengerLastName = domainEvent.Passenger.LastName,
-            PassengerEmail = domainEvent.Passenger.Email.Value
-        };
+        ArgumentNullException.ThrowIfNull(domainEvent);
+
+        var type = domainEvent.GetType();
+        if (!_mappers.TryGetValue(type, out var mapFunc))
+            throw new InvalidOperationException($"Mapper was not found for an event of type {type.Name}");
+
+        return mapFunc(domainEvent);
     }
 
-    public static ReservationCancelledEventDto ToDto(this ReservationCancelledEvent domainEvent)
+    public static void Register<TEvent>(Func<TEvent, object> mapper) where TEvent : IExternalDomainEvent
     {
-        return new ReservationCancelledEventDto
-        {
-            EventId = domainEvent.EventId,
-            OccurredAt = domainEvent.OccurredAt,
-            ReservationId = domainEvent.ReservationId.Value,
-            FlightId = domainEvent.FlightId.Value,
-            FlightNumber = domainEvent.FlightNumber.Value,
-            SeatNumber = domainEvent.SeatNumber.Value,
-            PassengerFirstName = domainEvent.Passenger.FirstName,
-            PassengerLastName = domainEvent.Passenger.LastName,
-            PassengerEmail = domainEvent.Passenger.Email.Value
-        };
-    }
-
-    public static ReservationExpiredEventDto ToDto(this ReservationExpiredEvent domainEvent)
-    {
-        return new ReservationExpiredEventDto
-        {
-            EventId = domainEvent.EventId,
-            OccurredAt = domainEvent.OccurredAt,
-            ReservationId = domainEvent.ReservationId.Value,
-            FlightId = domainEvent.FlightId.Value,
-            FlightNumber = domainEvent.FlightNumber.Value,
-            SeatNumber = domainEvent.SeatNumber.Value,
-            PassengerFirstName = domainEvent.Passenger.FirstName,
-            PassengerLastName = domainEvent.Passenger.LastName,
-            PassengerEmail = domainEvent.Passenger.Email.Value
-        };
+        _mappers[typeof(TEvent)] = e => mapper((TEvent)e);
     }
 }

@@ -1,7 +1,7 @@
-﻿using FBS.Infrastructure.Events;
+﻿using FBS.Infrastructure.Events.Options;
 using Microsoft.Extensions.Options;
 
-namespace FBS.Infrastructure.OptionsValidators;
+namespace FBS.Infrastructure.Events.OptionsValidators;
 
 public class EventPublisherOptionsValidator : IValidateOptions<EventPublisherOptions>
 {

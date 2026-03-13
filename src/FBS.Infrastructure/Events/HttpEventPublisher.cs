@@ -7,13 +7,15 @@ namespace FBS.Infrastructure.Events;
 
 public class HttpEventPublisher(
     NotificationSystemHttpClient fbnsClient,
+    IEventMapper eventMapper,
     ILogger<HttpEventPublisher> logger) : IEventPublisher
 {
     private readonly NotificationSystemHttpClient _fbnsClient = fbnsClient;
+    private readonly IEventMapper _eventMapper = eventMapper;
     private readonly ILogger<HttpEventPublisher> _logger = logger;
 
     public async Task PublishAsync<TEvent>(TEvent @event,CancellationToken cancellationToken)
-        where TEvent : IDomainEvent
+        where TEvent : IExternalDomainEvent
     {
         var (endpoint, dto) = MapEventToEndpointAndDto(@event);
 
@@ -44,15 +46,15 @@ public class HttpEventPublisher(
         }
     }
 
-    private static (string? endpoint, object? dto) MapEventToEndpointAndDto<TEvent>(TEvent @event)
+    private (string? endpoint, object? dto) MapEventToEndpointAndDto<TEvent>(TEvent @event)
         where TEvent : IDomainEvent
     {
         return @event switch
         {
-            ReservationCreatedEvent created => ("/webhooks/reservation-created", created.ToDto()),
-            ReservationConfirmedEvent confirmed => ("/webhooks/reservation-confirmed", confirmed.ToDto()),
-            ReservationCancelledEvent cancelled => ("/webhooks/reservation-cancelled", cancelled.ToDto()),
-            ReservationExpiredEvent expired => ("/webhooks/reservation-expired", expired.ToDto()),
+            ReservationCreatedEvent created => ("/webhooks/reservation-created", _eventMapper.MapToDto(created)),
+            ReservationConfirmedEvent confirmed => ("/webhooks/reservation-confirmed", _eventMapper.MapToDto(confirmed)),
+            ReservationCancelledEvent cancelled => ("/webhooks/reservation-cancelled", _eventMapper.MapToDto(cancelled)),
+            ReservationExpiredEvent expired => ("/webhooks/reservation-expired", _eventMapper.MapToDto(expired)),
             _ => (null, null)
         };
     }

@@ -1,4 +1,4 @@
-﻿namespace FBS.Infrastructure.Events;
+﻿namespace FBS.Infrastructure.Events.Options;
 
 public class EventPublisherOptions
 {
