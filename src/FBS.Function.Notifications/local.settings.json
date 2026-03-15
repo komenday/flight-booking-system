@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ServiceBusConnection__fullyQualifiedNamespace": "fbs-servicebus-dev.servicebus.windows.net",
+    "MailtrapApi__ApiToken": "09addfcab50b013e540a4a01e599305f",
+    "MailtrapApi__InboxId": "4411729",
+    "MailtrapApi__FromEmail": "noreply@flightbooking.com",
+    "MailtrapApi__FromName": "Flight Booking System"
+  }
+}
