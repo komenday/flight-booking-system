@@ -1,10 +1,7 @@
 using FBS.Application;
 using FBS.Infrastructure;
-using FBS.Infrastructure.BackgroundJobs;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Seed;
-using Hangfire;
-using Hangfire.Dashboard;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -51,25 +48,6 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions
-    {
-        Authorization = [new HangfireAuthorizationFilter()]
-    });
-}
-
-var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
-recurringJobManager.AddOrUpdate<ExpireReservationsJob>(
-    "expire-reservations",
-    job => job.ExecuteAsync(CancellationToken.None),
-    "*/2 * * * *",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Utc
-    }
-);
-
 app.UseExceptionHandler(options => { });
 app.UseCors("AllowNotificationSystem");
 app.UseHttpsRedirection();
@@ -83,11 +61,3 @@ if (app.Environment.IsDevelopment())
 }
 
 await app.RunAsync();
-
-public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
-{
-    public bool Authorize(DashboardContext context)
-    {
-        return true;
-    }
-}

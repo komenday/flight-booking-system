@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "appInsights1": {
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/microsoft.insights/components/fbs-dev",
+      "type": "appInsights.azure",
+      "connectionId": "APPLICATIONINSIGHTS_CONNECTION_STRING"
+    },
+    "storage1": {
+      "serviceConnectorResourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('serviceConnectorResourceGroupName')]/providers/Microsoft.Web/sites/expire-func-dev/providers/Microsoft.ServiceLinker/linkers/AzureWebJobsStorage_1F9537E87B, /subscriptions/d7d2ece6-4b9b-403c-940b-32ed7e6d5538/resourceGroups/rg-fbs-dev/providers/Microsoft.Web/sites/expire-func-dev/providers/Microsoft.ServiceLinker/linkers/AzureWebJobsStorage_CF48E625C4",
+      "secretStore": "AzureAppSettings",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.Storage/storageAccounts/storagefbsdev",
+      "type": "storage.azure",
+      "connectionId": "AzureWebJobsStorage",
+      "dynamicId": null
+    }
+  }
+}

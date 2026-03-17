@@ -7,7 +7,6 @@ namespace FBS.Application;
 
 public static class DependencyInjection
 {
-    // TODO
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         var assembly = Assembly.GetExecutingAssembly();

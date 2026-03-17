@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ServiceBus__FullyQualifiedNamespace": "fbs-servicebus-dev.servicebus.windows.net",
+    "ServiceBus__QueueName": "reservation-events",
+    "ServiceBus__TimeoutSeconds": "30",
+    "ServiceBus__MaxRetryAttempts": "3",
+    "EventPublisher__BaseUrl": "https://placeholder.local",
+    "EventPublisher__RetryCount": "3",
+    "EventPublisher__TimeoutSeconds": "30"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=FlightBookingDb_Dev;Trusted_Connection=true;MultipleActiveResultSets=true"
+  }
+}
