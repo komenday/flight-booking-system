@@ -10,8 +10,6 @@ using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Persistence.Repositories;
 using FBS.Infrastructure.Seed;
 using FBS.Infrastructure.Services;
-using Hangfire;
-using Hangfire.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,30 +66,7 @@ public static class DependencyInjection
         services.AddSingleton<IValidateOptions<ServiceBusOptions>, ServiceBusOptionsValidator>();
 
         services.AddSingleton<IEventMapper, EventMapper>();
-
         services.AddSingleton<IEventPublisher, ServiceBusEventPublisher>();
-
-        services.AddHangfire(config => config
-            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UseSqlServerStorage(
-                defaultConnectionString,
-                new SqlServerStorageOptions
-                {
-                    CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
-                    SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
-                    QueuePollInterval = TimeSpan.Zero,
-                    UseRecommendedIsolationLevel = true,
-                    DisableGlobalLocks = true,
-                    SchemaName = "Hangfire"
-                }));
-
-        services.AddHangfireServer(options =>
-        {
-            options.WorkerCount = 2;
-            options.ServerName = "FBS-BackgroundProcessor";
-        });
 
         services.AddScoped<ExpireReservationsJob>();
         services.AddScoped<FlightDataSeeder>();
