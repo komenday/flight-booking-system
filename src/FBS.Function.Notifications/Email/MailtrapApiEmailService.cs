@@ -46,7 +46,7 @@ public class MailtrapApiEmailService(
                 Html = htmlContent
             };
 
-            _logger.LogDebug("Sending POST to Mailtrap API: {Endpoint}", $"api/send/{_options.InboxId}");
+            _logger.LogInformation("Sending POST to Mailtrap API: {Endpoint}", $"api/send/{_options.InboxId}");
 
             var response = await _httpClient.PostAsJsonAsync(
                 $"api/send/{_options.InboxId}",

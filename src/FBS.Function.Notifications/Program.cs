@@ -11,12 +11,14 @@ using Microsoft.Extensions.Options;
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
+
+builder.Services.AddApplicationInsightsTelemetryWorkerService();
 builder.Services.ConfigureFunctionsApplicationInsights();
 
 builder.Services.Configure<MailtrapApiOptions>(
     builder.Configuration.GetSection(MailtrapApiOptions.SectionName));
 
-builder.Services.AddHttpClient<MailtrapApiEmailService>((serviceProvider, client) =>
+builder.Services.AddHttpClient<IEmailService, MailtrapApiEmailService>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<MailtrapApiOptions>>().Value;
 
@@ -31,7 +33,6 @@ builder.Services.AddHttpClient<MailtrapApiEmailService>((serviceProvider, client
 })
 .AddStandardResilienceHandler();
 
-builder.Services.AddScoped<IEmailService, MailtrapApiEmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
 builder.Build().Run();

@@ -1,0 +1,107 @@
+name: 02 · Deploy API
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: [main]
+    paths:
+      - 'src/FBS.API/**'
+      - 'src/FBS.Application/**'
+      - 'src/FBS.Domain/**'
+      - 'src/FBS.Infrastructure/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PROJECT_PATH: src/FBS.API/FBS.API.csproj
+  APP_SERVICE_NAME: fbs-dev
+  RESOURCE_GROUP: rg-fbs-dev
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration Release
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} --no-build --configuration Release --output ./publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fbs-api
+          path: ./publish
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    needs: build
+    environment: dev
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fbs-api
+          path: ./publish
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure App Settings
+        run: |
+          az webapp config appsettings set --name ${{ env.APP_SERVICE_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --settings "APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=b2bf0185-8c53-4182-a1c5-53500cdffcda;IngestionEndpoint=https://westeurope-5.in.applicationinsights.azure.com/;LiveEndpoint=https://westeurope.livediagnostics.monitor.azure.com/;ApplicationId=22331197-55aa-4f63-890e-05c1bde4e59b" "APPLICATIONINSIGHTS_AUTHENTICATION_STRING=Authorization=AAD" "ConnectionStrings__DefaultConnection=${{ secrets.SQL_CONNECTION_STRING }}" "ServiceBus__FullyQualifiedNamespace=fbs-servicebus-dev.servicebus.windows.net" "ServiceBus__QueueName=reservation-events" "ServiceBus__TimeoutSeconds=30" "ServiceBus__MaxRetryAttempts=3" "EventPublisher__BaseUrl=https://placeholder.local" "EventPublisher__RetryCount=3" "EventPublisher__TimeoutSeconds=30"
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.APP_SERVICE_NAME }}
+          package: ./publish
+
+      - name: Health check
+        run: |
+          echo "Waiting for app to start..."
+          sleep 45
+          for i in 1 2 3 4 5; do
+            response=$(curl --silent --output /dev/null --write-out "%{http_code}" https://${{ env.APP_SERVICE_NAME }}.azurewebsites.net/swagger/index.html)
+            echo "Attempt $i: HTTP $response"
+            if [ "$response" = "200" ]; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Not ready yet, waiting 10s..."
+            sleep 10
+          done
+          echo "Health check failed after all attempts"
+          exit 1

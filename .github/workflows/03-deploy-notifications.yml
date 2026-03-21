@@ -1,0 +1,90 @@
+name: 03 · Deploy Notifications Function
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: [main]
+    paths:
+      - 'src/FBS.Function.Notifications/**'
+      - 'src/FBS.Infrastructure/**'
+      - 'src/FBS.Application/**'
+      - 'src/FBS.Domain/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PROJECT_PATH: src/FBS.Function.Notifications/FBS.Function.Notifications.csproj
+  FUNCTION_APP_NAME: fbns-func-dev
+  RESOURCE_GROUP: rg-fbs-dev
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration Release
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} --no-build --configuration Release --output ./publish
+
+      - name: Create deployment zip
+        run: cd ./publish && zip -r ../function-notifications.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fbs-notifications
+          path: function-notifications.zip
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    needs: build
+    environment: dev
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fbs-notifications
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure App Settings
+        run: |
+          az functionapp config appsettings set --name ${{ env.FUNCTION_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --settings "APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=b2bf0185-8c53-4182-a1c5-53500cdffcda;IngestionEndpoint=https://westeurope-5.in.applicationinsights.azure.com/;LiveEndpoint=https://westeurope.livediagnostics.monitor.azure.com/;ApplicationId=22331197-55aa-4f63-890e-05c1bde4e59b" "APPLICATIONINSIGHTS_AUTHENTICATION_STRING=Authorization=AAD" "FUNCTIONS_EXTENSION_VERSION=~4" "FUNCTIONS_WORKER_RUNTIME=dotnet-isolated" "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED=1" "AzureWebJobsStorage__accountName=storagefbsdev" "ServiceBusConnection__fullyQualifiedNamespace=fbs-servicebus-dev.servicebus.windows.net" "MailtrapApi__ApiToken=${{ secrets.MAILTRAP_API_TOKEN }}" "MailtrapApi__InboxId=${{ secrets.MAILTRAP_INBOX_ID }}" "MailtrapApi__FromEmail=noreply@flightbooking.com" "MailtrapApi__FromName=Flight Booking System" "WEBSITE_RUN_FROM_PACKAGE=1"
+
+      - name: Deploy zip to Function App
+        run: |
+          az functionapp deployment source config-zip --name ${{ env.FUNCTION_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --src function-notifications.zip --build-remote false
