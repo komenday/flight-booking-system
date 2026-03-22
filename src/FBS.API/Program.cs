@@ -1,3 +1,4 @@
+using FBS.API.Middlewares;
 using FBS.Application;
 using FBS.Infrastructure;
 using FBS.Infrastructure.Persistence;
@@ -31,6 +32,9 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
 
 using var scope = app.Services.CreateScope();
@@ -48,7 +52,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-app.UseExceptionHandler(options => { });
+app.UseExceptionHandler();
 app.UseCors("AllowNotificationSystem");
 app.UseHttpsRedirection();
 app.UseAuthorization();
