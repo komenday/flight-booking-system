@@ -1,0 +1,1057 @@
+{
+  "info": {
+    "name": "Flight Booking System API",
+    "_postman_id": "fbs-collection-v2",
+    "description": "Complete test collection for FBS API.\n\nRun order for E2E flow:\n1. Search Flights \u2192 saves flightNumber automatically\n2. Get Flight By Number \u2192 saves seatNumber automatically\n3. Create Reservation \u2192 saves reservationId automatically\n4. Get Reservation \u2192 assert status is Pending\n5. Confirm Reservation \u2192 204\n6. Get Reservation \u2192 assert status is Confirmed\n\nNote on error responses: MapErrorToResponse returns a plain string body, not ProblemDetails JSON.\nError assertions use pm.response.text() accordingly.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "flightNumber",
+      "value": "AA387"
+    },
+    {
+      "key": "seatNumber",
+      "value": ""
+    },
+    {
+      "key": "reservationId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Flights",
+      "item": [
+        {
+          "name": "01 Search Flights \u2014 200 Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is an array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Each flight has required fields', () => {",
+                  "    pm.response.json().forEach(f => {",
+                  "        pm.expect(f).to.have.all.keys('flightId','flightNumber','departureAirport','arrivalAirport','departureTime','availableSeats');",
+                  "    });",
+                  "});",
+                  "const flights = pm.response.json();",
+                  "if (flights.length > 0) {",
+                  "    pm.collectionVariables.set('flightNumber', flights[0].flightNumber);",
+                  "    console.log('Saved flightNumber:', flights[0].flightNumber);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/search?departureAirport=BCN&arrivalAirport=ATL&date=2026-04-08T00:00:00Z",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "departureAirport",
+                  "value": "BCN"
+                },
+                {
+                  "key": "arrivalAirport",
+                  "value": "ATL"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-04-08T00:00:00Z"
+                }
+              ]
+            },
+            "description": "Search flights JFK\u2192LAS. On success, saves the first result's flightNumber to collection variable."
+          }
+        },
+        {
+          "name": "01b Search Flights \u2014 200 No Results (valid route, no flights seeded for that pair)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is empty array', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('array').that.is.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/search?departureAirport=BCN&arrivalAirport=ATL&date=2099-12-31T00:00:00Z",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "departureAirport",
+                  "value": "BCN"
+                },
+                {
+                  "key": "arrivalAirport",
+                  "value": "ATL"
+                },
+                {
+                  "key": "date",
+                  "value": "2099-12-31T00:00:00Z"
+                }
+              ]
+            },
+            "description": "Far-future date with no seeded flights. Returns 200 with empty array \u2014 absence of results is not an error."
+          }
+        },
+        {
+          "name": "01c Search Flights \u2014 400 Past Date (date < today)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error body is a non-empty string', () => {",
+                  "    pm.expect(pm.response.text()).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/search?departureAirport=BCN&arrivalAirport=ATL&date=2020-01-01T00:00:00Z",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "departureAirport",
+                  "value": "BCN"
+                },
+                {
+                  "key": "arrivalAirport",
+                  "value": "ATL"
+                },
+                {
+                  "key": "date",
+                  "value": "2020-01-01T00:00:00Z"
+                }
+              ]
+            },
+            "description": "GetAvailableFlightsValidator: Date must be today or in the future \u2192 400."
+          }
+        },
+        {
+          "name": "01d Search Flights \u2014 400 Same Departure and Arrival Airport",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/search?departureAirport=BCN&arrivalAirport=BCN&date=2026-04-08T00:00:00Z",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "departureAirport",
+                  "value": "BCN"
+                },
+                {
+                  "key": "arrivalAirport",
+                  "value": "BCN"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-04-08T00:00:00Z"
+                }
+              ]
+            },
+            "description": "Validator: departure and arrival airports must be different \u2192 400."
+          }
+        },
+        {
+          "name": "01e Search Flights \u2014 400 Invalid Airport Code Format (lowercase)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/search?departureAirport=bcn&arrivalAirport=ATL&date=2026-04-08T00:00:00Z",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "departureAirport",
+                  "value": "bcn"
+                },
+                {
+                  "key": "arrivalAirport",
+                  "value": "ATL"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-04-08T00:00:00Z"
+                }
+              ]
+            },
+            "description": "Validator: airport code must match ^[A-Z]{3}$ \u2192 400 for lowercase."
+          }
+        },
+        {
+          "name": "01f Search Flights \u2014 400 Missing Required Parameters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/search?departureAirport=BCN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "departureAirport",
+                  "value": "BCN"
+                }
+              ]
+            },
+            "description": "Missing arrivalAirport and date \u2192 400."
+          }
+        },
+        {
+          "name": "02 Get Flight By Number \u2014 200 Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has flight details with seats', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys('flightId','flightNumber','departureAirport','arrivalAirport','departureTime','totalSeats','availableSeats','seats');",
+                  "    pm.expect(body.seats).to.be.an('array').and.not.empty;",
+                  "});",
+                  "pm.test('Each seat has seatNumber and isAvailable', () => {",
+                  "    pm.response.json().seats.forEach(s => {",
+                  "        pm.expect(s).to.have.property('seatNumber');",
+                  "        pm.expect(s).to.have.property('isAvailable');",
+                  "    });",
+                  "});",
+                  "const availableSeat = pm.response.json().seats.find(s => s.isAvailable);",
+                  "if (availableSeat) {",
+                  "    pm.collectionVariables.set('seatNumber', availableSeat.seatNumber);",
+                  "    console.log('Saved seatNumber:', availableSeat.seatNumber);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/{{flightNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "{{flightNumber}}"
+              ],
+              "query": []
+            },
+            "description": "Get full flight details including seat map. Uses flightNumber saved from step 01. Saves first available seatNumber."
+          }
+        },
+        {
+          "name": "02b Get Flight By Number \u2014 404 Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error body is a non-empty string', () => pm.expect(pm.response.text()).to.not.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/UA9999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "UA9999"
+              ],
+              "query": []
+            },
+            "description": "Valid format but non-existent flight number \u2192 404 Not Found."
+          }
+        },
+        {
+          "name": "02c Get Flight By Number \u2014 400 Invalid Format",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/INVALID-NUMBER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "INVALID-NUMBER"
+              ],
+              "query": []
+            },
+            "description": "GetFlightByNumberValidator: format must match ^[A-Z]{2}\\d{3,4}$ (e.g. UA123, BA4567) \u2192 400."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "03 Create Reservation \u2014 201 Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response has reservationId', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('reservationId');",
+                  "    pm.expect(body.reservationId).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('reservationId', pm.response.json().reservationId);",
+                  "console.log('Saved reservationId:', pm.response.json().reservationId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"{{seatNumber}}\",\n  \"firstName\": \"Yurii\",\n  \"lastName\": \"Komenda\",\n  \"email\": \"yurii@example.com\",\n  \"phone\": \"+380978587412\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Create reservation using flightNumber and seatNumber saved from previous steps. Saves reservationId on success."
+          }
+        },
+        {
+          "name": "03b Create Reservation \u2014 409 Seat Already Taken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error body is a non-empty string', () => pm.expect(pm.response.text()).to.not.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"{{seatNumber}}\",\n  \"firstName\": \"Another\",\n  \"lastName\": \"Passenger\",\n  \"email\": \"another@example.com\",\n  \"phone\": \"+380978000001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Attempt to book a seat that is already reserved (same seat as step 03) \u2192 409 Conflict. Run after 03."
+          }
+        },
+        {
+          "name": "03c Create Reservation \u2014 404 Flight Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"ZZ9999\",\n  \"seatNumber\": \"1A\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"+380978587412\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Non-existent flight number (valid format, no matching flight) \u2192 404 Not Found."
+          }
+        },
+        {
+          "name": "03d Create Reservation \u2014 400 Invalid Email Format",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"1A\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"not-an-email\",\n  \"phone\": \"+380978587412\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "PassengerInfoDtoValidator: invalid email format \u2192 400."
+          }
+        },
+        {
+          "name": "03e Create Reservation \u2014 400 Invalid Phone Format",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"1A\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Validator: phone must match E.164 format (^\\+?[1-9]\\d{1,14}$) \u2192 400."
+          }
+        },
+        {
+          "name": "03f Create Reservation \u2014 400 Invalid Seat Number Format",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"0A\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"+380978587412\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Validator: seat must match ^[1-9][0-9]?[A-F]$ \u2014 '0A' is invalid (starts with 0) \u2192 400."
+          }
+        },
+        {
+          "name": "03g Create Reservation \u2014 400 Name Contains Invalid Characters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"1A\",\n  \"firstName\": \"T3st!!!\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"+380978587412\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Validator: name must match ^[a-zA-Z\\s\\-']+$ \u2014 digits and special chars are rejected \u2192 400."
+          }
+        },
+        {
+          "name": "04 Get Reservation \u2014 200 Happy Path (status: Pending)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has reservation fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('reservationId');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body).to.have.property('flightNumber');",
+                  "    pm.expect(body).to.have.property('seatNumber');",
+                  "});",
+                  "pm.test('Status is Pending after creation', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('Pending');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/get/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "get",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Get reservation details. Run after 03 \u2014 status must be Pending."
+          }
+        },
+        {
+          "name": "04b Get Reservation \u2014 404 Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/get/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "get",
+                "00000000-0000-0000-0000-000000000000"
+              ],
+              "query": []
+            },
+            "description": "Nil GUID \u2014 valid format but no matching reservation \u2192 404."
+          }
+        },
+        {
+          "name": "05 Confirm Reservation \u2014 204 Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Response body is empty', () => pm.expect(pm.response.text()).to.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/confirm/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "confirm",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Confirm a Pending reservation \u2192 204 No Content. Run after 03."
+          }
+        },
+        {
+          "name": "05b Confirm Reservation \u2014 409 Already Confirmed (ReservationMustBePendingToConfirmRule)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error body is a non-empty string', () => pm.expect(pm.response.text()).to.not.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/confirm/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "confirm",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Attempt to confirm an already Confirmed reservation. Business rule: must be Pending \u2192 409. Run after 05."
+          }
+        },
+        {
+          "name": "05c Confirm Reservation \u2014 404 Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/confirm/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "confirm",
+                "00000000-0000-0000-0000-000000000000"
+              ],
+              "query": []
+            },
+            "description": "Confirm non-existent reservation \u2192 404."
+          }
+        },
+        {
+          "name": "06 Get Reservation \u2014 200 Status is Confirmed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is Confirmed after confirmation', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('Confirmed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/get/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "get",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Verify status after confirmation. Run after 05 \u2014 status must be Confirmed."
+          }
+        },
+        {
+          "name": "07 Cancel Reservation \u2014 204 Happy Path",
+          "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "exec": [
+                  "// This request cancels the reservation.",
+                  "// To test cancel independently: first run 03 to create a fresh Pending reservation."
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Response body is empty', () => pm.expect(pm.response.text()).to.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/cancel/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "cancel",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Cancel a Pending reservation \u2192 204 No Content. The seat is released."
+          }
+        },
+        {
+          "name": "07b Cancel Reservation \u2014 409 Already Cancelled (CannotCancelExpiredOrCancelledReservationRule)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error body is a non-empty string', () => pm.expect(pm.response.text()).to.not.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/cancel/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "cancel",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Attempt to cancel an already Cancelled reservation. Business rule: cannot cancel Cancelled or Expired \u2192 409. Run after 07."
+          }
+        },
+        {
+          "name": "07c Cancel Reservation \u2014 409 Confirmed Reservation (CannotCancelExpiredOrCancelledReservationRule does not apply, but Confirmed is also non-cancellable)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/cancel/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "cancel",
+                "{{reservationId}}"
+              ],
+              "query": []
+            },
+            "description": "Attempt to cancel a Confirmed reservation \u2192 409. Run after 05 (Confirm) and before 07 (Cancel)."
+          }
+        },
+        {
+          "name": "07d Cancel Reservation \u2014 404 Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/cancel/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "cancel",
+                "00000000-0000-0000-0000-000000000000"
+              ],
+              "query": []
+            },
+            "description": "Cancel non-existent reservation \u2192 404."
+          }
+        }
+      ]
+    }
+  ]
+}
