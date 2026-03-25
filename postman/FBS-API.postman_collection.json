@@ -21,6 +21,16 @@
     {
       "key": "reservationId",
       "value": ""
+    },
+    {
+      "key": "cancelReservationId",
+      "value": "",
+      "description": "Set automatically by pre-request script in 07 Cancel"
+    },
+    {
+      "key": "confirmedReservationId",
+      "value": "",
+      "description": "Set automatically by pre-request script in 07c Cancel Confirmed"
     }
   ],
   "item": [
@@ -417,6 +427,49 @@
       "name": "Reservations",
       "item": [
         {
+          "name": "00 Reservation Suite Setup \u2014 Get Available Seat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// This runs SYNCHRONOUSLY after the response.",
+                  "// Sets seatNumber in environment so 03 Create can use {{seatNumber}}.",
+                  "// Must run before 03 Create Reservation.",
+                  "const seats = pm.response.json().seats || [];",
+                  "const available = seats.find(function(s) { return s.isAvailable; });",
+                  "if (available) {",
+                  "    pm.environment.set(\"seatNumber\", available.seatNumber);",
+                  "    console.log(\"Setup: available seat found:\", available.seatNumber);",
+                  "} else {",
+                  "    console.error(\"Setup: no available seats on flight \u2014 cannot run 03-07 tests\");",
+                  "}",
+                  "pm.test(\"Flight has available seats for reservation tests\",",
+                  "    () => pm.expect(available).to.not.be.undefined);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/{{flightNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "{{flightNumber}}"
+              ],
+              "query": []
+            },
+            "description": "Setup step: fetches flight seat map synchronously. Test script sets seatNumber in environment for use in 03 Create Reservation. Must be the first request in the Reservations folder."
+          }
+        },
+        {
           "name": "03 Create Reservation \u2014 201 Happy Path",
           "event": [
             {
@@ -429,8 +482,12 @@
                   "    pm.expect(body).to.have.property('reservationId');",
                   "    pm.expect(body.reservationId).to.be.a('string').and.not.empty;",
                   "});",
-                  "pm.collectionVariables.set('reservationId', pm.response.json().reservationId);",
-                  "console.log('Saved reservationId:', pm.response.json().reservationId);"
+                  "const reservationId = pm.response.json().reservationId;",
+                  "// Write to environment (not just collectionVariables) so {{reservationId}}",
+                  "// in subsequent request URLs resolves correctly (environment takes priority).",
+                  "pm.environment.set('reservationId', reservationId);",
+                  "pm.collectionVariables.set('reservationId', reservationId);",
+                  "console.log('Saved reservationId:', reservationId);"
                 ],
                 "type": "text/javascript"
               }
@@ -607,7 +664,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"1A\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"12345\"\n}"
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"1A\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"abc\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/reservations/create",
@@ -621,7 +678,7 @@
               ],
               "query": []
             },
-            "description": "Validator: phone must match E.164 format (^\\+?[1-9]\\d{1,14}$) \u2192 400."
+            "description": "Validator: phone must match E.164 format (^\\+?[1-9]\\d{1,14}$). \"12345\" actually passes this regex (starts with [1-9] + 4 digits). \"abc\" is truly invalid and correctly returns 400."
           }
         },
         {
@@ -708,6 +765,20 @@
           "name": "04 Get Reservation \u2014 200 Happy Path (status: Pending)",
           "event": [
             {
+              "listen": "pre-request",
+              "script": {
+                "exec": [
+                  "// Relies on 03 having set pm.environment(\"reservationId\").",
+                  "// If reservationId is missing, 03 Create did not run or failed \u2014 check 03 first.",
+                  "const id = pm.environment.get(\"reservationId\") || pm.collectionVariables.get(\"reservationId\");",
+                  "if (!id) {",
+                  "    console.error(\"04 pre-request: reservationId not set. Run 03 Create first.\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -763,7 +834,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reservations/get/00000000-0000-0000-0000-000000000000",
+              "raw": "{{baseUrl}}/api/reservations/get/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -771,16 +842,26 @@
                 "api",
                 "reservations",
                 "get",
-                "00000000-0000-0000-0000-000000000000"
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
               ],
               "query": []
             },
-            "description": "Nil GUID \u2014 valid format but no matching reservation \u2192 404."
+            "description": "Non-zero non-existent GUID. Note: nil GUID (all zeros) triggers FluentValidation NotEmpty() validation \u2192 400, not 404. A random non-existent GUID correctly returns 404."
           }
         },
         {
           "name": "05 Confirm Reservation \u2014 204 Happy Path",
           "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "exec": [
+                  "const id = pm.environment.get(\"reservationId\") || pm.collectionVariables.get(\"reservationId\");",
+                  "if (!id) { console.error(\"05 pre-request: reservationId not set. Run 03 Create first.\"); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -841,7 +922,7 @@
               ],
               "query": []
             },
-            "description": "Attempt to confirm an already Confirmed reservation. Business rule: must be Pending \u2192 409. Run after 05."
+            "description": "Attempts to confirm the same reservation from step 05, which is now Confirmed. Business rule ReservationMustBePendingToConfirmRule \u2192 409. Run after 05 Confirm Reservation."
           }
         },
         {
@@ -861,7 +942,7 @@
             "method": "PUT",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reservations/confirm/00000000-0000-0000-0000-000000000000",
+              "raw": "{{baseUrl}}/api/reservations/confirm/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -869,11 +950,11 @@
                 "api",
                 "reservations",
                 "confirm",
-                "00000000-0000-0000-0000-000000000000"
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
               ],
               "query": []
             },
-            "description": "Confirm non-existent reservation \u2192 404."
+            "description": "Non-zero non-existent GUID returns 404 Not Found. Nil GUID (all zeros) triggers FluentValidation NotEmpty \u2192 400, not 404."
           }
         },
         {
@@ -912,18 +993,109 @@
           }
         },
         {
-          "name": "07 Cancel Reservation \u2014 204 Happy Path",
+          "name": "07 Cancel Suite Setup \u2014 Get Available Seat for Cancel Test",
           "event": [
             {
-              "listen": "pre-request",
+              "listen": "test",
               "script": {
                 "exec": [
-                  "// This request cancels the reservation.",
-                  "// To test cancel independently: first run 03 to create a fresh Pending reservation."
+                  "// Refreshes seatNumber to an available seat for the cancel test.",
+                  "// The seat used in 03 Create is now taken (Confirmed after 05).",
+                  "// This finds the next available seat.",
+                  "",
+                  "const seats = pm.response.json().seats || [];",
+                  "const available = seats.find(function(s) { return s.isAvailable; });",
+                  "",
+                  "pm.test(\"Cancel Suite Setup: flight has available seats\", function() {",
+                  "    pm.expect(available, \"No available seats \u2014 all seats may be taken\").to.not.be.undefined;",
+                  "});",
+                  "",
+                  "if (available) {",
+                  "    pm.environment.set(\"seatNumber\", available.seatNumber);",
+                  "    pm.collectionVariables.set(\"seatNumber\", available.seatNumber);",
+                  "    console.log(\"Setup: refreshed seatNumber to\", available.seatNumber);",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/flights/{{flightNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "flights",
+                "{{flightNumber}}"
+              ],
+              "query": []
             },
+            "description": "Setup step: refreshes the available seatNumber for the cancel test suite. The seat from 03 Create is Confirmed and no longer available. This finds the next available seat synchronously via test script."
+          }
+        },
+        {
+          "name": "07 Cancel Suite Setup \u2014 Create Pending Reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Creates a fresh Pending reservation for the 07 / 07b cancel tests.",
+                  "// Runs synchronously: test script fires after response is received.",
+                  "// cancelReservationId is guaranteed to be set before 07 executes.",
+                  "",
+                  "pm.test(\"Setup: reservation created for cancel tests\", function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const id = pm.response.json().reservationId;",
+                  "    pm.environment.set(\"cancelReservationId\", id);",
+                  "    pm.collectionVariables.set(\"cancelReservationId\", id);",
+                  "    console.log(\"Setup 07: cancelReservationId =\", id);",
+                  "} else {",
+                  "    console.error(\"Setup 07 failed:\", pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flightNumber\": \"{{flightNumber}}\",\n  \"seatNumber\": \"{{seatNumber}}\",\n  \"firstName\": \"Cancel\",\n  \"lastName\": \"Test\",\n  \"email\": \"cancel@test.com\",\n  \"phone\": \"+380970000001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "create"
+              ],
+              "query": []
+            },
+            "description": "Setup step: creates a fresh Pending reservation using the seat found by \"00 Reservation Suite Setup\". Saves cancelReservationId synchronously in test script. Must run immediately before 07 Cancel Reservation."
+          }
+        },
+        {
+          "name": "07 Cancel Reservation \u2014 204 Happy Path",
+          "event": [
             {
               "listen": "test",
               "script": {
@@ -939,7 +1111,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reservations/cancel/{{reservationId}}",
+              "raw": "{{baseUrl}}/api/reservations/cancel/{{cancelReservationId}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -947,11 +1119,11 @@
                 "api",
                 "reservations",
                 "cancel",
-                "{{reservationId}}"
+                "{{cancelReservationId}}"
               ],
               "query": []
             },
-            "description": "Cancel a Pending reservation \u2192 204 No Content. The seat is released."
+            "description": "Cancel a fresh Pending reservation created by the \"07 Cancel Suite Setup\" request. cancelReservationId is set synchronously by that setup step. \u2192 204 No Content."
           }
         },
         {
@@ -972,7 +1144,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reservations/cancel/{{reservationId}}",
+              "raw": "{{baseUrl}}/api/reservations/cancel/{{cancelReservationId}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -980,11 +1152,11 @@
                 "api",
                 "reservations",
                 "cancel",
-                "{{reservationId}}"
+                "{{cancelReservationId}}"
               ],
               "query": []
             },
-            "description": "Attempt to cancel an already Cancelled reservation. Business rule: cannot cancel Cancelled or Expired \u2192 409. Run after 07."
+            "description": "Attempts to cancel the same reservation that was just cancelled in 07. Business rule CannotCancelExpiredOrCancelledReservationRule \u2192 409. Run after 07 Cancel Reservation."
           }
         },
         {
@@ -1016,7 +1188,7 @@
               ],
               "query": []
             },
-            "description": "Attempt to cancel a Confirmed reservation \u2192 409. Run after 05 (Confirm) and before 07 (Cancel)."
+            "description": "Attempts to cancel the reservation from step 03 which is Confirmed (after step 05). Business rule prevents cancelling a Confirmed reservation \u2192 409. Run after 05 Confirm Reservation. Uses the same {{reservationId}} as all other reservation tests."
           }
         },
         {
@@ -1036,7 +1208,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reservations/cancel/00000000-0000-0000-0000-000000000000",
+              "raw": "{{baseUrl}}/api/reservations/cancel/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1044,11 +1216,11 @@
                 "api",
                 "reservations",
                 "cancel",
-                "00000000-0000-0000-0000-000000000000"
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
               ],
               "query": []
             },
-            "description": "Cancel non-existent reservation \u2192 404."
+            "description": "Cancel non-existent reservation using a random non-existent GUID \u2192 404. Nil GUID (all zeros) would trigger FluentValidation NotEmpty \u2192 400."
           }
         }
       ]
