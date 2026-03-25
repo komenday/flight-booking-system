@@ -30,15 +30,13 @@ public class ReservationMustNotBeExpiredToConfirmRule(ReservationId reservationI
     public RuleErrorType ErrorType => RuleErrorType.Conflict;
 }
 
-public class CannotCancelExpiredOrCancelledReservationRule(ReservationId reservationId, ReservationStatus currentStatus)
+public class CannotCancelNonPendingReservationRule(ReservationId reservationId, ReservationStatus currentStatus)
     : IBusinessRule
 {
     private readonly ReservationStatus _currentStatus = currentStatus;
     private readonly ReservationId _reservationId = reservationId;
 
-    public bool IsBroken() =>
-        _currentStatus == ReservationStatus.Expired ||
-        _currentStatus == ReservationStatus.Cancelled;
+    public bool IsBroken() => _currentStatus != ReservationStatus.Pending;
 
     public string Message => $"Cannot cancel reservation {_reservationId.Value} in status {_currentStatus}";
 

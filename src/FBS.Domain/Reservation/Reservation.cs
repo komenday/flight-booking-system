@@ -90,7 +90,7 @@ public class Reservation : AggregateRoot<ReservationId>
 
     public void Cancel()
     {
-        this.CheckRule(new CannotCancelExpiredOrCancelledReservationRule(Id, Status));
+        this.CheckRule(new CannotCancelNonPendingReservationRule(Id, Status));
 
         Status = ReservationStatus.Cancelled;
 
