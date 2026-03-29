@@ -4,6 +4,8 @@ using FBS.Infrastructure;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,36 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
+
+var otlpEndpoint = builder.Configuration["NewRelic:OtlpEndpoint"] ?? "https://otlp.nr-data.net:4318";
+var licenseKey = builder.Configuration["NewRelic:LicenseKey"];
+
+if (!string.IsNullOrWhiteSpace(otlpEndpoint) && !string.IsNullOrWhiteSpace(licenseKey))
+{
+    var serviceName = builder.Configuration["NewRelic:ServiceName"] ?? "FBS-API";
+
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource
+            .AddService(serviceName)
+            .AddAttributes(new Dictionary<string, object>
+            {
+                ["environment.name"] = builder.Environment.EnvironmentName
+            }))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation(options =>
+            {
+                options.Filter = ctx =>
+                    !ctx.Request.Path.StartsWithSegments("/health");
+            })
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otlpEndpoint);
+                options.Headers = $"api-key={licenseKey}";
+            })
+        );
+}
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

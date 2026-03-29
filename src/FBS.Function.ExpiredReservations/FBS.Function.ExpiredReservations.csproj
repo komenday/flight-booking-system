@@ -20,6 +20,8 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.7" />
     <PackageReference Include="Microsoft.Extensions.Azure" Version="1.13.1" />
+    <PackageReference Include="NewRelic.Agent" Version="10.50.0" />
+    <PackageReference Include="NewRelic.Agent.Api" Version="10.50.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FBS.Infrastructure\FBS.Infrastructure.csproj" />
