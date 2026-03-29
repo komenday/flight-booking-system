@@ -4,6 +4,7 @@ using FBS.Infrastructure;
 using FBS.Infrastructure.Persistence;
 using FBS.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -39,6 +40,7 @@ if (!string.IsNullOrWhiteSpace(otlpEndpoint) && !string.IsNullOrWhiteSpace(licen
             {
                 options.Endpoint = new Uri(otlpEndpoint);
                 options.Headers = $"api-key={licenseKey}";
+                options.Protocol = OtlpExportProtocol.HttpProtobuf;
             })
         );
 }

@@ -1,483 +1,538 @@
-# ✈️ FBS - Flight Booking System
+# ✈️ Flight Booking System (FBS)
 
-A robust .NET-based flight reservation system implementing Domain-Driven Design (DDD) principles with Clean Architecture. Features real-time seat management, automated reservation expiration, and event-driven notifications.
+A production-grade .NET 10 flight seat reservation system built with **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS**, fully deployed to **Microsoft Azure**.
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/)
-[![Architecture](https://img.shields.io/badge/Architecture-Clean%20DDD-green)](https://learn.microsoft.com/en-us/dotnet/architecture/)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture%20%2B%20DDD-green)](https://learn.microsoft.com/en-us/dotnet/architecture/)
+[![Azure](https://img.shields.io/badge/Cloud-Microsoft%20Azure-0089D6)](https://azure.microsoft.com/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF)](https://github.com/features/actions)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## 📋 Table of Contents
 
-- [Features](#-features)
+- [Overview](#-overview)
 - [Architecture](#-architecture)
+- [Azure Infrastructure](#-azure-infrastructure)
 - [Technologies](#-technologies)
-- [Getting Started](#-getting-started)
 - [Project Structure](#-project-structure)
 - [API Endpoints](#-api-endpoints)
 - [Domain Model](#-domain-model)
+- [Getting Started](#-getting-started)
 - [Configuration](#-configuration)
-- [Development](#-development)
-- [Testing](#-testing)
-- [Deployment](#-deployment)
-- [License](#-license)
+- [CI/CD](#-cicd)
+- [Monitoring](#-monitoring)
 
-## ✨ Features
+---
 
-### Core Functionality
-- **Flight Management** - Browse available flights with real-time seat availability
-- **Seat Reservation** - Reserve specific seats with automatic conflict prevention
-- **Reservation Lifecycle** - Pending → Confirmed → Expired/Cancelled states
-- **Automatic Expiration** - Background job expires unpaid reservations after 10 minutes
-- **Real-time Updates** - Concurrent reservation handling with optimistic locking
+## 🔍 Overview
 
-### Technical Features
-- **Domain-Driven Design** - Rich domain model with business rules enforcement
-- **Clean Architecture** - Clear separation of concerns across layers
-- **Event-Driven** - Domain events for loose coupling and notifications
-- **CQRS Pattern** - Separate read and write operations with MediatR
-- **Repository Pattern** - Abstracted data access with Unit of Work
-- **Background Jobs** - Hangfire for recurring tasks and job scheduling
-- **API Documentation** - Interactive Swagger/OpenAPI documentation
-- **Retry Logic** - Resilient database operations with exponential backoff
+FBS allows passengers to search for flights, reserve seats, confirm or cancel reservations, and receive email notifications at each lifecycle stage. The system enforces a 10-minute confirmation window — unconfirmed reservations are automatically expired and their seats released.
+
+### Core Features
+
+- **Flight Search** — search available flights by route and date with real-time seat availability
+- **Seat Reservation** — reserve a specific seat with conflict prevention via optimistic concurrency (RowVersion)
+- **Reservation Lifecycle** — `Pending → Confirmed / Cancelled / Expired`
+- **Automatic Expiration** — Azure Function Timer trigger expires unconfirmed reservations every 2 minutes
+- **Email Notifications** — event-driven email notifications at every lifecycle transition via Mailtrap API
+- **Resilient HTTP** — Polly v8 standard resilience pipeline (retry + circuit breaker) for outbound HTTP calls
+
+---
 
 ## 🏗️ Architecture
 
 ### Clean Architecture Layers
 
 ```
-┌─────────────────────────────────────────┐
-│           FBS.API (Presentation)        │
-│   Controllers, Middleware, Endpoints    │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│      FBS.Application (Use Cases)        │
-│  Commands, Queries, DTOs, Validators    │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│        FBS.Domain (Business Logic)      │
-│  Entities, Value Objects, Rules, Events │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│    FBS.Infrastructure (Data & I/O)      │
-│  EF Core, Repositories, External APIs   │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│               FBS.API  (Presentation)               │
+│    REST Controllers · GlobalExceptionHandler        │
+│    OpenTelemetry (OTLP → New Relic)                 │
+└──────────────────────────┬──────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────┐
+│            FBS.Application  (Use Cases)             │
+│  Commands · Queries · DTOs · FluentValidation       │
+│  MediatR Pipeline: Logging · Validation · Tx        │
+└──────────────────────────┬──────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────┐
+│              FBS.Domain  (Business Logic)           │
+│   Aggregates · Value Objects · Domain Events        │
+│   Business Rules · Specifications · Result<T>       │
+└──────────────────────────┬──────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────┐
+│           FBS.Infrastructure  (Data & I/O)          │
+│   EF Core · Repositories · UnitOfWork               │
+│   ServiceBusEventPublisher · DomainEventDispatcher  │
+└─────────────────────────────────────────────────────┘
 ```
 
-### Key Patterns & Principles
+### Key Patterns
 
-- **Domain-Driven Design (DDD)** - Aggregates, Entities, Value Objects, Domain Events
-- **CQRS** - Command/Query separation with MediatR
-- **Repository Pattern** - Data access abstraction
-- **Unit of Work** - Transaction management
-- **Specification Pattern** - Reusable business rules
-- **Pipeline Behaviors** - Cross-cutting concerns (validation, transactions, logging)
+| Pattern | Implementation |
+|---|---|
+| **CQRS** | Full separation: Commands (write) and Queries (read) via MediatR. Shared Azure SQL database. |
+| **DDD** | Aggregates (`Flight`, `Reservation`), Value Objects (`FlightNumber`, `SeatNumber`, `Email`), Domain Events |
+| **Repository + Unit of Work** | `IFlightRepository`, `IReservationRepository`, `IUnitOfWork` — EF Core implementations in Infrastructure |
+| **Specification Pattern** | `ExpiredReservationsSpecification`, `ReservationsByFlightSpecification` for reusable query logic |
+| **Pipeline Behaviors** | `ValidationBehavior` (FluentValidation), `TransactionBehavior` (EF Core), `LoggingBehavior` |
+| **Result Pattern** | `Result<T>` with `ErrorType` instead of throwing exceptions for business failures |
+| **Domain Events** | Raised inside aggregates, dispatched after `SaveChanges` via `IDomainEventDispatcher` |
+| **Managed Identity** | Passwordless auth from App Service and Functions to SQL, Service Bus, Storage |
+
+---
+
+## ☁️ Azure Infrastructure
+
+All infrastructure is described as code with **Bicep** (`infra/`) and deployed via GitHub Actions.
+
+```
+Azure Resource Group: rg-fbs-dev (West Europe)
+│
+├── App Service (Linux B1)          fbs-dev
+│   └── FBS.API  →  Azure SQL (Poland Central)
+│
+├── Azure Function (Consumption)    fbns-func-dev
+│   └── FBS.Function.Notifications
+│       Service Bus Trigger → Mailtrap API
+│
+├── Azure Function (Consumption)    expire-func-dev
+│   └── FBS.Function.ExpiredReservations
+│       Timer Trigger (every 2 min) → Azure SQL
+│
+├── Azure Service Bus (Basic)       fbs-servicebus-dev
+│   └── Queue: reservation-events
+│
+├── Azure SQL (Basic 5 DTU)         fbs-sql-server-dev / fbs-db-dev
+│
+├── Storage Account                 storagefbsdev
+│   (Functions runtime state, Timer trigger locks)
+│
+└── Application Insights            fbs-dev
+    (shared across all three applications)
+```
+
+### Managed Identity RBAC
+
+| Principal | Resource | Role |
+|---|---|---|
+| `fbs-dev` | Azure SQL | `db_datareader` + `db_datawriter` |
+| `fbs-dev` | Service Bus | `Azure Service Bus Data Sender` |
+| `fbns-func-dev` | Service Bus | `Azure Service Bus Data Receiver` |
+| `fbns-func-dev` | Storage | Blob Owner · Queue Contributor · Table Contributor |
+| `expire-func-dev` | Azure SQL | `db_datareader` + `db_datawriter` |
+| `expire-func-dev` | Service Bus | `Azure Service Bus Data Sender` |
+| `expire-func-dev` | Storage | Blob Owner · Queue Contributor · Table Contributor |
+
+---
 
 ## 🛠️ Technologies
 
-### Core Stack
-- **.NET 10.0** - Latest LTS framework
-- **ASP.NET Core 10.0** - Web API framework
-- **Entity Framework Core 10.0** - ORM for database access
-- **SQL Server** - Relational database
+### Core
 
-### Libraries & Tools
-- **MediatR** - CQRS and mediator pattern implementation
-- **FluentValidation** - Request validation
-- **Hangfire** - Background job processing
-- **Polly** - Resilience and transient fault handling
-- **Serilog** - Structured logging
-- **Swagger/OpenAPI** - API documentation
+| Technology | Version | Purpose |
+|---|---|---|
+| **.NET / ASP.NET Core** | 10.0 | API framework |
+| **Entity Framework Core** | 10.0 | ORM, Code-First migrations |
+| **Azure SQL** | — | Relational database |
+| **MediatR** | 12.x | CQRS, pipeline behaviors |
+| **FluentValidation** | 11.x | Request validation |
 
-## 🚀 Getting Started
+### Azure & Cloud
 
-### Prerequisites
+| Technology | Purpose |
+|---|---|
+| **Azure App Service** (Linux) | Hosts FBS.API |
+| **Azure Functions v4** (Windows, isolated) | Notifications and expiration background processing |
+| **Azure Service Bus** | Event-driven messaging between API and Functions |
+| **Azure SQL** | Database with Entra-ID-only authentication |
+| **Azure Storage** | Functions runtime state and distributed timer locks |
+| **Azure Managed Identity** | Passwordless auth across all Azure services |
 
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [SQL Server 2019+](https://www.microsoft.com/sql-server) or SQL Server Express
-- [Visual Studio 2022](https://visualstudio.microsoft.com/) or [JetBrains Rider](https://www.jetbrains.com/rider/) (recommended)
-- Optional: [SQL Server Management Studio](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms)
+### Observability & DevOps
 
-### Installation
+| Technology | Purpose |
+|---|---|
+| **Application Insights** | Telemetry, live metrics, log stream |
+| **New Relic APM** | Distributed tracing, error inbox, performance dashboards |
+| **OpenTelemetry** (OTLP/HTTP) | Vendor-neutral instrumentation for Linux App Service |
+| **GitHub Actions** | 4 CI/CD pipelines (Infrastructure + 3 app deployments) |
+| **Bicep** | Infrastructure as Code |
+| **OIDC Workload Identity Federation** | Passwordless GitHub → Azure authentication |
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/flight-booking-system.git
-   cd flight-booking-system
-   ```
+### Libraries
 
-2. **Configure database connection**
-   
-   Update `src/FBS.API/appsettings.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Server=localhost;Database=FlightBookingSystem;Trusted_Connection=True;TrustServerCertificate=True"
-     }
-   }
-   ```
+| Library | Purpose |
+|---|---|
+| **Polly v8 / Microsoft.Extensions.Http.Resilience** | HTTP retry + circuit breaker |
+| **Bogus** | Flight seed data generation |
+| **Mailtrap API** | Email delivery (sandbox) |
 
-3. **Apply database migrations**
-   ```bash
-   cd src/FBS.Infrastructure
-   dotnet ef database update --startup-project ../FBS.API
-   ```
-
-4. **Run the application**
-   ```bash
-   cd ../FBS.API
-   dotnet run
-   ```
-
-5. **Access the API**
-   - Swagger UI: https://localhost:5001/swagger
-   - API Base URL: https://localhost:5001/api
-
-### Quick Test
-
-Create a test reservation:
-```bash
-curl -X POST https://localhost:5001/api/reservations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "flightNumber": "AA1234",
-    "seatNumber": "12A",
-    "passengerFirstName": "John",
-    "passengerLastName": "Doe",
-    "passengerEmail": "john.doe@example.com"
-  }'
-```
+---
 
 ## 📁 Project Structure
 
 ```
-src/
-├── FBS.API/                    # Presentation Layer
-│   ├── Controllers/            # API endpoints
-│   ├── Middleware/             # Custom middleware
-│   └── Program.cs              # Application entry point
+flight-booking-system/
+├── src/
+│   ├── FBS.API/                          # ASP.NET Core Web API (Linux App Service)
+│   │   ├── Controllers/                  # FlightsController, ReservationsController
+│   │   ├── DTOs/                         # Request DTOs
+│   │   ├── Middlewares/                  # GlobalExceptionHandler (ValidationProblemDetails)
+│   │   └── Program.cs                    # App bootstrap, OpenTelemetry setup
+│   │
+│   ├── FBS.Application/                  # Use cases (no framework dependencies)
+│   │   ├── Commands/                     # CreateReservation, ConfirmReservation,
+│   │   │                                 # CancelReservation, ExpireReservation
+│   │   ├── Queries/                      # GetAvailableFlights, GetFlightByNumber,
+│   │   │                                 # GetReservation
+│   │   └── Common/
+│   │       ├── Behaviors/                # ValidationBehavior, TransactionBehavior,
+│   │       │                             # LoggingBehavior
+│   │       └── Result/                   # Result<T>, ErrorType
+│   │
+│   ├── FBS.Domain/                       # Pure business logic, no dependencies
+│   │   ├── Flight/                       # Flight aggregate, Seat, Value Objects,
+│   │   │                                 # SeatReservedEvent, SeatReleasedEvent
+│   │   ├── Reservation/                  # Reservation aggregate, Value Objects,
+│   │   │                                 # ReservationCreated/Confirmed/Cancelled/ExpiredEvent
+│   │   ├── Common/
+│   │   │   ├── Base/                     # AggregateRoot<T>, Entity<T>, DomainEventBase
+│   │   │   ├── Rules/                    # Business rule classes + IBusinessRule
+│   │   │   └── Specifications/           # Specification<T>, ExpiredReservationsSpecification
+│   │   ├── Repositories/                 # IFlightRepository, IReservationRepository, IUnitOfWork
+│   │   └── SharedKernel/                 # Email, PhoneNumber, Airport value objects
+│   │
+│   ├── FBS.Infrastructure/               # EF Core, repositories, external services
+│   │   ├── Persistence/                  # ApplicationDbContext, EF configs, migrations
+│   │   ├── EventDispatcher/              # IDomainEventDispatcher, post-save dispatch
+│   │   ├── Events/                       # ServiceBusEventPublisher, EventMapper, DTOs
+│   │   ├── BackgroundJobs/               # ExpireReservationsJob (used by Azure Function)
+│   │   └── Seed/                         # FlightDataSeeder (Bogus)
+│   │
+│   ├── FBS.Function.Notifications/       # Azure Function — Service Bus trigger
+│   │   ├── Functions/                    # ProcessReservationEventFunction
+│   │   │                                 # Complete/Abandon/DeadLetter settlement
+│   │   ├── Notification/                 # NotificationService
+│   │   ├── Email/                        # MailtrapApiEmailService, options
+│   │   └── Templates/                    # EmailTemplates (HTML)
+│   │
+│   └── FBS.Function.ExpiredReservations/ # Azure Function — Timer trigger
+│       └── Functions/                    # ExpireReservationsFunction (every 2 min)
 │
-├── FBS.Application/            # Application Layer
-│   ├── Commands/               # Write operations
-│   │   ├── CreateReservation/
-│   │   ├── ConfirmReservation/
-│   │   ├── CancelReservation/
-│   │   └── ExpireReservation/
-│   ├── Queries/                # Read operations
-│   │   ├── GetAvailableFlights/
-│   │   ├── GetFlightByNumber/
-│   │   └── GetReservation/
-│   ├── Common/                 # Shared application logic
-│   │   ├── Behaviors/          # MediatR pipeline behaviors
-│   │   └── Result/             # Result pattern implementation
-│   └── EventHandlers/          # Domain event handlers
+├── infra/                                # Bicep Infrastructure as Code
+│   ├── main.bicep
+│   ├── main.bicepparam
+│   └── modules/                          # app-insights, api-app, function-app,
+│                                         # service-bus, sql, storage
 │
-├── FBS.Domain/                 # Domain Layer
-│   ├── Flight/                 # Flight aggregate
-│   │   ├── Flight.cs           # Aggregate root
-│   │   ├── FlightId.cs         # Value object
-│   │   ├── FlightNumber.cs     # Value object
-│   │   ├── SeatNumber.cs       # Value object
-│   │   ├── Events/             # Domain events
-│   │   └── Rules/              # Business rules
-│   ├── Reservation/            # Reservation aggregate
-│   │   ├── Reservation.cs      # Aggregate root
-│   │   ├── ReservationId.cs    # Value object
-│   │   ├── ReservationStatus.cs # Enumeration
-│   │   ├── Events/             # Domain events
-│   │   └── Rules/              # Business rules
-│   ├── SharedKernel/           # Shared value objects
-│   │   ├── Email.cs
-│   │   └── PassengerInfo.cs
-│   ├── Common/                 # Domain infrastructure
-│   │   ├── Base/               # Base classes
-│   │   └── Interfaces/         # Domain interfaces
-│   ├── Repositories/           # Repository interfaces
-│   └── Services/               # Domain services
+├── .github/workflows/
+│   ├── 01-infrastructure.yml             # Bicep deploy (on infra/** changes)
+│   ├── 02-deploy-api.yml                 # Build + deploy FBS.API
+│   ├── 03-deploy-notifications.yml       # Build + zip-deploy FBS.Function.Notifications
+│   └── 04-deploy-expire.yml              # Build + zip-deploy FBS.Function.ExpiredReservations
 │
-└── FBS.Infrastructure/         # Infrastructure Layer
-    ├── Persistence/            # Data access
-    │   ├── ApplicationDbContext.cs
-    │   ├── Configurations/     # EF Core configurations
-    │   ├── Repositories/       # Repository implementations
-    │   └── Migrations/         # Database migrations
-    ├── EventDispatcher/        # Domain event dispatcher
-    ├── Events/                 # External event publisher
-    ├── BackgroundJobs/         # Hangfire jobs
-    ├── Services/               # Infrastructure services
-    └── Seed/                   # Database seeding
+├── postman/
+│   ├── FBS-API.postman_collection.json   # 26 test cases with pre-request scripts
+│   ├── FBS-Local.postman_environment.json
+│   └── FBS-AzureDev.postman_environment.json
+│
+└── scripts/
+    └── setup-rbac.ps1                    # One-time RBAC role assignment script
 ```
+
+---
 
 ## 🔌 API Endpoints
 
 ### Flights
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/flights` | Get all available flights |
-| `GET` | `/api/flights/{flightNumber}` | Get flight details by number |
+| Method | Endpoint | Description | Response |
+|--------|----------|-------------|----------|
+| `GET` | `/api/flights/search?departureAirport=BCN&arrivalAirport=ATL&date=2026-04-08` | Search flights by route and date | `200 FlightSummaryDto[]` |
+| `GET` | `/api/flights/{flightNumber}` | Get flight details with full seat map | `200 FlightDetailsDto` / `404` |
 
 ### Reservations
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/reservations` | Create a new reservation |
-| `GET` | `/api/reservations/{id}` | Get reservation details |
-| `POST` | `/api/reservations/{id}/confirm` | Confirm a reservation |
-| `DELETE` | `/api/reservations/{id}` | Cancel a reservation |
+| Method | Endpoint | Description | Response |
+|--------|----------|-------------|----------|
+| `POST` | `/api/reservations/create` | Create a new Pending reservation | `201 CreateReservationResponse` |
+| `GET` | `/api/reservations/get/{id}` | Get reservation details | `200 ReservationDetailsDto` / `404` |
+| `PUT` | `/api/reservations/confirm/{id}` | Confirm a Pending reservation | `204` / `409` |
+| `DELETE` | `/api/reservations/cancel/{id}` | Cancel a Pending reservation | `204` / `409` |
 
-### Health
+### Example: Create Reservation
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check endpoint |
-
-### Example Request: Create Reservation
-
-**POST** `/api/reservations`
+**POST** `/api/reservations/create`
 
 ```json
 {
-  "flightNumber": "AA1234",
-  "seatNumber": "12A",
-  "passengerFirstName": "John",
-  "passengerLastName": "Doe",
-  "passengerEmail": "john.doe@example.com"
+  "flightNumber": "AA387",
+  "seatNumber": "5C",
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "phone": "+380971234567"
 }
 ```
 
-**Response** (201 Created):
+**201 Created:**
 ```json
 {
-  "isSuccess": true,
-  "value": {
-    "reservationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "flightNumber": "AA1234",
-    "seatNumber": "12A",
-    "status": "Pending",
-    "expiresAt": "2024-02-26T12:15:00Z",
-    "message": "Reservation created successfully. Please confirm within 15 minutes."
-  }
+  "reservationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "flightId": "fb29e71f-5219-4dc9-8b8b-daf709de2afb",
+  "flightNumber": "AA387",
+  "seatNumber": "5C",
+  "passengerName": "John Doe",
+  "status": "Pending",
+  "createdAt": "2026-04-08T10:00:00Z",
+  "expiresAt": "2026-04-08T10:10:00Z"
 }
 ```
+
+---
 
 ## 🎯 Domain Model
 
 ### Aggregates
 
-#### Flight Aggregate
-- **Root Entity**: `Flight`
-- **Value Objects**: `FlightId`, `FlightNumber`, `SeatNumber`
-- **Business Rules**:
-  - Cannot reserve already reserved seat
-  - Cannot release unreserved seat
-  - Flight must have available capacity
+**Flight**
+- `Flight` (AggregateRoot) → owns `Seat` collection
+- Value Objects: `FlightId`, `FlightNumber`, `SeatNumber`, `Airport`
+- Domain Events: `SeatReservedEvent`, `SeatReleasedEvent`
+- Business Rules: seat must be available to reserve; seat must be reserved to release
 
-#### Reservation Aggregate
-- **Root Entity**: `Reservation`
-- **Value Objects**: `ReservationId`, `PassengerInfo`, `Email`
-- **States**: Pending → Confirmed / Cancelled / Expired
-- **Business Rules**:
-  - Can only confirm pending reservations
-  - Cannot cancel confirmed reservations
-  - Expires automatically after 15 minutes if not confirmed
+**Reservation**
+- `Reservation` (AggregateRoot)
+- Value Objects: `ReservationId`, `PassengerInfo`, `Email`, `PhoneNumber`
+- States: `Pending → Confirmed | Cancelled | Expired`
+- Domain Events: `ReservationCreatedEvent`, `ReservationConfirmedEvent`, `ReservationCancelledEvent`, `ReservationExpiredEvent`
+- Business Rules:
+  - `ReservationMustBePendingToConfirmRule`
+  - `ReservationMustNotBeExpiredToConfirmRule`
+  - `CannotCancelNonPendingReservationRule` (Pending only; Confirmed/Expired/Cancelled → 409)
+  - `OnlyPendingReservationsCanExpireRule`
 
-### Domain Events
+### Event Flow
 
-#### Internal Events (Local Processing)
-- `SeatReservedEvent` - Triggered when seat is reserved
-- `SeatReleasedEvent` - Triggered when seat is released
+```
+FBS.API
+  └─► CreateReservationCommandHandler
+        ├─► Flight.ReserveSeat()  → SeatReservedEvent (internal)
+        ├─► Reservation.Create()  → ReservationCreatedEvent
+        └─► UnitOfWork.SaveChanges()
+              └─► DomainEventDispatcher
+                    └─► ServiceBusEventPublisher
+                          └─► Service Bus Queue: reservation-events
+                                └─► FBS.Function.Notifications
+                                      └─► MailtrapApiEmailService
+```
 
-#### External Events (Sent to FBNS)
-- `ReservationCreatedEvent` - Sent to notification system
-- `ReservationConfirmedEvent` - Sent to notification system
-- `ReservationCancelledEvent` - Sent to notification system
-- `ReservationExpiredEvent` - Sent to notification system
+---
 
-## ⚙️ Configuration
+## 🚀 Getting Started
 
-### Database Configuration
+### Prerequisites
 
-**appsettings.json**:
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- SQL Server (LocalDB is sufficient for local development)
+- [Azure Functions Core Tools v4](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local) (for running Functions locally)
+- [Azurite](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite) (local Azure Storage emulator)
+- Azure CLI (`az login` for Managed Identity local development)
+
+### Local Setup
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/komenday/flight-booking-system.git
+cd flight-booking-system
+```
+
+**2. Configure `appsettings.Development.json` in `FBS.API`**
+
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=FlightBookingSystem;Integrated Security=true;TrustServerCertificate=True",
-    "HangfireConnection": "Server=localhost;Database=FlightBookingSystem;Integrated Security=true;TrustServerCertificate=True"
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=FBS_Dev;Trusted_Connection=True;"
   }
 }
 ```
 
-### Event Publisher Configuration
-
-**appsettings.json**:
-```json
-{
-  "EventPublisher": {
-    "BaseUrl": "https://localhost:5002",
-    "ApiKey": "your-api-key-here",
-    "RetryCount": 3,
-    "TimeoutSeconds": 10
-  }
-}
-```
-
-### Logging Configuration
-
-**appsettings.json**:
-```json
-{
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Information",
-      "Override": {
-        "Microsoft": "Warning",
-        "Microsoft.EntityFrameworkCore": "Warning"
-      }
-    },
-    "WriteTo": [
-      {
-        "Name": "Console"
-      },
-      {
-        "Name": "File",
-        "Args": {
-          "path": "logs/fbs-.log",
-          "rollingInterval": "Day"
-        }
-      }
-    ]
-  }
-}
-```
-
-## 👨‍💻 Development
-
-### Running in Development
+**3. Apply migrations and seed data**
 
 ```bash
-# Run with hot reload
-dotnet watch run --project src/FBS.API
+cd src/FBS.Infrastructure
+dotnet ef database update --startup-project ../FBS.API
+```
 
-# Run with specific environment
-dotnet run --project src/FBS.API --environment Development
+Migrations run automatically on startup. Seed data (15 random flights) is inserted if the Flights table is empty.
+
+**4. Run the API**
+
+```bash
+cd src/FBS.API
+dotnet run
+```
+
+Swagger UI: [http://localhost:5000/swagger](http://localhost:5000/swagger)
+
+**5. Run Functions locally (optional)**
+
+Start Azurite, then in separate terminals:
+
+```bash
+cd src/FBS.Function.Notifications
+func start
+
+cd src/FBS.Function.ExpiredReservations
+func start
 ```
 
 ### Database Migrations
 
 ```bash
-# Add new migration
-cd src/FBS.Infrastructure
-dotnet ef migrations add MigrationName --startup-project ../FBS.API
+# Add a new migration
+dotnet ef migrations add MigrationName \
+  --project src/FBS.Infrastructure \
+  --startup-project src/FBS.API
 
 # Apply migrations
-dotnet ef database update --startup-project ../FBS.API
-
-# Rollback migration
-dotnet ef database update PreviousMigrationName --startup-project ../FBS.API
-
-# Remove last migration (if not applied)
-dotnet ef migrations remove --startup-project ../FBS.API
+dotnet ef database update \
+  --project src/FBS.Infrastructure \
+  --startup-project src/FBS.API
 ```
-
-### Seeding Data
-
-The system automatically seeds sample flights on startup (Development environment only):
-
-```csharp
-// In Program.cs
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    var seeder = scope.ServiceProvider.GetRequiredService<FlightDataSeeder>();
-    await seeder.SeedAsync();
-}
-```
-
-### Background Jobs
-
-View Hangfire dashboard: https://localhost:5001/hangfire
-
-**Jobs:**
-- `ExpireReservationsJob` - Runs every minute to expire old reservations
-
-## 🧪 Testing
-
-### Run Tests
-
-```bash
-# Run all tests
-dotnet test
-
-# Run with coverage
-dotnet test /p:CollectCoverage=true
-
-# Run specific test project
-dotnet test tests/FBS.Domain.Tests
-```
-
-### Test Structure
-
-```
-tests/
-├── FBS.Domain.Tests/           # Domain logic tests
-│   ├── FlightTests.cs
-│   ├── ReservationTests.cs
-│   └── BusinessRulesTests.cs
-├── FBS.Application.Tests/      # Application logic tests
-│   ├── Commands/
-│   └── Queries/
-└── FBS.API.Tests/              # API integration tests
-    └── Controllers/
-```
-
-## 🚢 Deployment
-
-### Docker
-
-```bash
-# Build image
-docker build -t fbs:latest .
-
-# Run container
-docker run -d -p 5000:80 \
-  -e ConnectionStrings__DefaultConnection="your-connection-string" \
-  fbs:latest
-```
-
-### Azure App Service
-
-```bash
-# Publish to Azure
-az webapp up --name your-app-name --resource-group your-rg --runtime "DOTNETCORE:10.0"
-```
-
-### Environment Variables
-
-Required environment variables:
-- `ConnectionStrings__DefaultConnection` - Database connection string
-- `EventPublisher__BaseUrl` - FBNS API URL
-- `EventPublisher__ApiKey` - FBNS API key
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Contact
-
-- **Project Link**: [https://github.com/komenday/flight-booking-system](https://github.com/komenday/flight-booking-system)
-- **Documentation**: [https://docs.flightbooking.dev](https://docs.flightbooking.dev)
-- **Issues**: [https://github.com/komenday/flight-booking-system/issues](https://github.com/komenday/flight-booking-system/issues)
-
-## 🙏 Acknowledgments
-
-- [Clean Architecture by Robert C. Martin](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
-- [Domain-Driven Design by Eric Evans](https://www.domainlanguage.com/ddd/)
-- [Microsoft Architecture Guides](https://learn.microsoft.com/en-us/dotnet/architecture/)
-- [MediatR Documentation](https://github.com/jbogard/MediatR)
 
 ---
 
-Built with ❤️ using .NET 10 and Clean Architecture principles.
+## ⚙️ Configuration
+
+### FBS.API — `appsettings.json`
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": ""
+  },
+  "ServiceBus": {
+    "FullyQualifiedNamespace": "fbs-servicebus-dev.servicebus.windows.net",
+    "QueueName": "reservation-events",
+    "TimeoutSeconds": 30,
+    "MaxRetryAttempts": 3
+  },
+  "EventPublisher": {
+    "BaseUrl": "",
+    "RetryCount": 3,
+    "TimeoutSeconds": 30
+  },
+  "NewRelic": {
+    "LicenseKey": "",
+    "ServiceName": "FBS-API",
+    "OtlpEndpoint": "https://otlp.eu01.nr-data.net:4318"
+  }
+}
+```
+
+### FBS.Function.Notifications — `local.settings.json`
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ServiceBusConnection__fullyQualifiedNamespace": "fbs-servicebus-dev.servicebus.windows.net",
+    "MailtrapApi__ApiToken": "YOUR_TOKEN",
+    "MailtrapApi__InboxId": "YOUR_INBOX_ID",
+    "MailtrapApi__FromEmail": "noreply@flightbooking.com",
+    "MailtrapApi__FromName": "Flight Booking System"
+  }
+}
+```
+
+### FBS.Function.ExpiredReservations — `local.settings.json`
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ServiceBus__FullyQualifiedNamespace": "fbs-servicebus-dev.servicebus.windows.net",
+    "ServiceBus__QueueName": "reservation-events",
+    "EventPublisher__BaseUrl": "https://placeholder.local",
+    "EventPublisher__RetryCount": "3",
+    "EventPublisher__TimeoutSeconds": "30"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=FBS_Dev;Trusted_Connection=True;"
+  }
+}
+```
+
+---
+
+## 🔄 CI/CD
+
+Four GitHub Actions workflows with OIDC Workload Identity Federation (no client secrets):
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `01-infrastructure.yml` | Push to `infra/**` or manual | Deploys Bicep — validates then applies Incremental |
+| `02-deploy-api.yml` | Push to `src/FBS.API/**` or shared layers | Build → Publish → Configure App Settings → Deploy → Health check |
+| `03-deploy-notifications.yml` | Push to `src/FBS.Function.Notifications/**` | Build → Publish → Zip → Configure App Settings → Zip Deploy |
+| `04-deploy-expire.yml` | Push to `src/FBS.Function.ExpiredReservations/**` | Build → Publish → Zip → Configure App Settings → Zip Deploy |
+
+### Required GitHub Secrets
+
+| Secret | Used in |
+|---|---|
+| `AZURE_CLIENT_ID` | All workflows (OIDC) |
+| `AZURE_TENANT_ID` | All workflows (OIDC) |
+| `AZURE_SUBSCRIPTION_ID` | All workflows (OIDC) |
+| `SQL_CONNECTION_STRING` | `02`, `04` |
+| `MAILTRAP_API_TOKEN` | `03` |
+| `MAILTRAP_INBOX_ID` | `03` |
+| `NEW_RELIC_LICENSE_KEY` | `02`, `03`, `04` |
+
+---
+
+## 📊 Monitoring
+
+### Application Insights
+
+Shared across all three applications. Filter by `cloud_RoleName` in Log Analytics:
+
+```kusto
+traces
+| where cloud_RoleName == "fbs-dev"
+| order by timestamp desc
+```
+
+### New Relic APM
+
+**FBS.API (Linux)** — OpenTelemetry OTLP integration:
+- Distributed traces for all HTTP requests and outbound HttpClient calls
+- Configurable via `NewRelic:*` app settings
+- Skips `/health` endpoint to reduce noise
+
+**FBS.Function.Notifications / FBS.Function.ExpiredReservations (Windows)** — Native New Relic .NET Agent via `NewRelic.Agent` NuGet package:
+- Auto-instruments Service Bus message processing, HTTP, async workflows
+- Configured via `NEW_RELIC_*` environment variables + `CORECLR_*` profiler settings
+
+All three services appear under **APM & Services** in New Relic UI.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 🔗 Links
+
+- **Repository**: [github.com/komenday/flight-booking-system](https://github.com/komenday/flight-booking-system)
+- **Live API**: [fbs-dev.azurewebsites.net/swagger](https://fbs-dev.azurewebsites.net/swagger)
