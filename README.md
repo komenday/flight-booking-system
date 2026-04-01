@@ -53,7 +53,7 @@ FBS allows passengers to search for flights, reserve seats, confirm or cancel re
 ┌──────────────────────────▼──────────────────────────┐
 │            FBS.Application  (Use Cases)             │
 │  Commands · Queries · DTOs · FluentValidation       │
-│  MediatR Pipeline: Logging · Validation · Tx        │
+│  MediatR Pipeline: Logging·Validation·Transactions  │
 └──────────────────────────┬──────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────┐
