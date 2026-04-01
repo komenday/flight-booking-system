@@ -53,7 +53,7 @@ FBS allows passengers to search for flights, reserve seats, confirm or cancel re
 ┌──────────────────────────▼──────────────────────────┐
 │            FBS.Application  (Use Cases)             │
 │  Commands · Queries · DTOs · FluentValidation       │
-│  MediatR Pipeline: Logging·Validation·Transactions  │
+│  MediatR Pipelines: Logging·Validation·Transactions │
 └──────────────────────────┬──────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────┐
@@ -251,17 +251,17 @@ flight-booking-system/
 
 | Method | Endpoint | Description | Response |
 |--------|----------|-------------|----------|
-| `GET` | `/api/flights/search?departureAirport=BCN&arrivalAirport=ATL&date=2026-04-08` | Search flights by route and date | `200 FlightSummaryDto[]` |
-| `GET` | `/api/flights/{flightNumber}` | Get flight details with full seat map | `200 FlightDetailsDto` / `404` |
+| `GET` | `/api/flights/search?departureAirport=BCN&arrivalAirport=ATL&date=2026-04-08` | Search flights by route and date | `200 FlightSummaryDto[]` / `400` |
+| `GET` | `/api/flights/{flightNumber}` | Get flight details with full seat map | `200 FlightDetailsDto` / `400` / `404` |
 
 ### Reservations
 
 | Method | Endpoint | Description | Response |
 |--------|----------|-------------|----------|
-| `POST` | `/api/reservations/create` | Create a new Pending reservation | `201 CreateReservationResponse` |
-| `GET` | `/api/reservations/get/{id}` | Get reservation details | `200 ReservationDetailsDto` / `404` |
-| `PUT` | `/api/reservations/confirm/{id}` | Confirm a Pending reservation | `204` / `409` |
-| `DELETE` | `/api/reservations/cancel/{id}` | Cancel a Pending reservation | `204` / `409` |
+| `POST` | `/api/reservations/create` | Create a new Pending reservation | `201 CreateReservationResponse` / `400` / `404` / `409` |
+| `GET` | `/api/reservations/get/{id}` | Get reservation details | `200 ReservationDetailsDto` / `400` / `404` |
+| `PUT` | `/api/reservations/confirm/{id}` | Confirm a Pending reservation | `204` / `400` / `404` / `409` |
+| `DELETE` | `/api/reservations/cancel/{id}` | Cancel a Pending reservation | `204` / `400` / `404` / `409` |
 
 ### Example: Create Reservation
 
