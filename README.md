@@ -1,6 +1,6 @@
 # ✈️ Flight Booking System (FBS)
 
-A production-grade .NET 10 flight seat reservation system built with **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS**, fully deployed to **Microsoft Azure**.
+A .NET 10 flight seat reservation system built with **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS**, fully deployed to **Microsoft Azure**.
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture%20%2B%20DDD-green)](https://learn.microsoft.com/en-us/dotnet/architecture/)
